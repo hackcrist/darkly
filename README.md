@@ -14,6 +14,12 @@ Colección educativa de herramientas de **Linux, redes y seguridad**, en españo
 
 > 📚 **Solo fines educativos.** Úsalo con responsabilidad y autorización. El escaneo de puertos pide confirmación explícita.
 
+## 📑 Índice
+
+- [Funciones](#-funciones) · [Uso rápido](#-uso-rápido) · [Cómo funciona](#️-cómo-funciona)
+- [Comandos Go](#-comandos-go) · [Estructura](#-estructura) · [Precisión](#-precisión-anti-fallos)
+- [FAQ](#-faq) · [Autor](#-autor)
+
 ## ✨ Funciones
 
 | Módulo | Qué hace |
@@ -42,6 +48,20 @@ go build -o darkly-go.exe . # compila el binario
 <p align="center">
   <img src="assets/demo.svg" alt="Menú Darkly Tools" width="520">
 </p>
+
+## ⌨️ Comandos Go
+
+```bash
+./darkly-go.exe scan --host 127.0.0.1 --ports 22,80,443   # escaneo concurrente
+./darkly-go.exe dns --host google.com                     # DNS sistema + DoH
+./darkly-go.exe audit 'mi-clave'                          # fortaleza + filtración
+./darkly-go.exe ipinfo 8.8.8.8                            # geo triple fuente
+./darkly-go.exe user torvalds                             # 17 sitios
+./darkly-go.exe report --ip 8.8.8.8 --nombre casa         # HTML+TXT+CSV+PDF
+./darkly-go.exe menu                                      # menú interactivo
+```
+
+Más: `ping subnet traceroute hash hashid pass genpass breach headers urlscan ptr rdap whois dnsrecords subdomains ghuser sysinfo filehash verify version`.
 
 ## 📁 Estructura
 
@@ -73,6 +93,26 @@ reportes/            # se auto-crea al usarlo (no se sube a git)
 - DoH por `one.one.one.one` (resiste redes con filtro TLS), geo triple con normalización
 - RDAP por HTTPS en vez de WHOIS, crt.sh con reintentos + respaldo HackerTarget
 - Ping/tracert decodificados OEM→UTF-8, puertos con banner real, URLs con heurística honesta
+
+## ❓ FAQ
+
+**¿Error SSL / CERTIFICATE_VERIFY_FAILED?**
+Instala certificados: `pip install -r requirements.txt` (incluye `certifi`). Si usas red con filtro TLS (escuela/trabajo), algunos endpoints se interceptan: el programa ya prefiere los que verifican limpio.
+
+**¿WHOIS dice "puerto 43 bloqueado"?**
+Normal en redes filtradas. Usa la opción RDAP, que va por HTTPS y da lo mismo.
+
+**¿crt.sh falla o tarda?**
+Su servidor es inestable (da 502 a ratos). Hay 3 reintentos + respaldo HackerTarget automáticos.
+
+**¿npm/Telegram/Medium salen "bloqueados"?**
+Esas páginas bloquean bots. npm se consulta por API oficial; el resto márcalo como indicio y verifícalo a mano en el navegador.
+
+**¿Sin registro PTR?**
+Significa que el dueño de la IP no creó reverso. Normal en móviles y nubes. No es error del programa.
+
+**¿Go no se reconoce?**
+Instálalo desde https://go.dev/dl/ y abre una terminal nueva (el PATH se actualiza al reabrir).
 
 ## 👤 Autor
 
