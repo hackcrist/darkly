@@ -45,19 +45,11 @@ go build -o darkly-go.exe . # compila el binario
 ```
 
 
-<p align="center">
-  <img src="assets/windows-terminal.png" alt="Darkly en Windows Terminal" width="700">
-</p>
+## 📸 Capturas
 
-## 📸 Capturas reales
-
-<p align="center">
-  <img src="assets/web.png" alt="Darkly Web" width="700">
-</p>
-
-<p align="center">
-  <img src="assets/termux.jpeg" alt="Darkly en Termux" width="300">
-</p>
+| Windows Terminal | Web | Termux |
+|---|---|---|
+| <img src="assets/windows-terminal.png" alt="Windows Terminal" width="300"> | <img src="assets/web.png" alt="Darkly Web" width="300"> | <img src="assets/termux.jpeg" alt="Termux" width="130"> |
 
 ## ⌨️ Comandos Go
 
