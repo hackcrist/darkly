@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Darkly Tools Web</title>
+<style>
+body{margin:0;font-family:Consolas,monospace;background:#0a0a14;color:#e8e8f0}
+header{padding:28px;text-align:center;background:linear-gradient(135deg,#00ffea,#b026ff,#ff00ff);color:#000}
+h1{margin:0;letter-spacing:6px}
+main{max-width:760px;margin:0 auto;padding:20px}
+.card{background:#14142b;border:1px solid #2de2ff55;border-radius:12px;padding:16px;margin:14px 0}
+input{width:70%;padding:8px;border-radius:8px;border:1px solid #2de2ff55;background:#0a0a14;color:#fff;font-family:inherit}
+button{padding:8px 14px;border-radius:8px;border:0;background:linear-gradient(90deg,#00ffea,#ff00ff);font-weight:bold;cursor:pointer}
+pre{white-space:pre-wrap;background:#0a0a14;border-radius:8px;padding:12px;max-height:300px;overflow:auto}
+small{color:#888}
+</style>
+</head>
+<body>
+<header><h1>DARKLY WEB</h1><p>Solo fines educativos · OSINT pasivo con límites</p></header>
+<main>
+<div class="card"><h3>DNS</h3><input id="dns" placeholder="google.com"><button onclick="go('/api/dns?host='+v('dns'))">Consultar</button></div>
+<div class="card"><h3>GeoIP</h3><input id="geo" placeholder="8.8.8.8"><button onclick="go('/api/geo?ip='+v('geo'))">Consultar</button></div>
+<div class="card"><h3>Analizar URL</h3><input id="u" placeholder="https://..."><button onclick="go('/api/urlscan?url='+encodeURIComponent(v('u')))">Analizar</button></div>
+<div class="card"><h3>Cabeceras HTTP</h3><input id="h" placeholder="https://..."><button onclick="go('/api/headers?url='+encodeURIComponent(v('h')))">Ver</button></div>
+<div class="card"><h3>Resultado</h3><pre id="out">Aquí sale el JSON...</pre><small>Escaneo de puertos desactivado en la web pública. Verificar contraseñas solo por API POST.</small></div>
+</main>
+<script>
+function v(id){return encodeURIComponent(document.getElementById(id).value.trim());}
+async function go(url){
+  const o=document.getElementById('out'); o.textContent='Consultando...';
+  try{const r=await fetch(url); o.textContent=JSON.stringify(await r.json(),null,2);}
+  catch(e){o.textContent='Error: '+e;}
+}
+</script>
+</body>
+</html>

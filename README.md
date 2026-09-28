@@ -83,10 +83,20 @@ python darkly.py
 
 El instalador detecta Termux/Linux/Windows, pone dependencias, pip y compila `darkly-go` solo. Sin root funciona todo menos algunos modos de traceroute.
 
+## 🌐 API + Web pública
+
+```bash
+pip install -r requirements-web.txt
+python webapp.py   # http://127.0.0.1:5000
+```
+
+Endpoints pasivos con límite: `/api/dns /api/geo /api/ptr /api/rdap /api/headers /api/urlscan /api/hash /api/subdomains /api/ghuser /api/user`, breach solo por `POST /api/breach`. El scan viene **desactivado** (`ENABLE_SCAN=0`); con `ENABLE_SCAN=1` + cabecera `X-Token: $DARKLY_TOKEN` se activa. Deploy: Render/Railway con `gunicorn webapp:app` y variables `DARKLY_TOKEN`, `ENABLE_SCAN=0`.
+
 ## 📁 Estructura
 
 ```
 darkly.py            # menú neón en español
+webapp.py + web/     # API + web pública (Flask, segura por defecto)
 tools/               # networking, security, gathering, username, system_tools, reporter, gospeed
 go/                  # darkly-go v2.1: los mismos módulos en Go (scan, dns, audit, report, menu...)
 reportes/            # se auto-crea al usarlo (no se sube a git)
