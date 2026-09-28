@@ -47,6 +47,15 @@ def main():
     here = os.path.dirname(os.path.abspath(__file__))
     system = platform.system().lower()
 
+    if system != "windows" and not DRY:
+        for f in ("darkly.py", "install.py"):
+            p = os.path.join(here, f)
+            try:
+                os.chmod(p, 0o755)
+                say(f"  permiso +x: {f}", "g")
+            except Exception as e:
+                say(f"  chmod {f} falló: {e}", "y")
+
     if is_termux():
         say("[1/4] pkg update...", "y")
         run(["pkg", "update", "-y"])
