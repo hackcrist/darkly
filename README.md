@@ -51,9 +51,9 @@ go build -o darkly-go.exe . # compila el binario
 
 ## 📸 Capturas reales
 
-| Termux (Android) | VS Code |
-|---|---|
-| <img src="assets/termux.jpeg" alt="Darkly en Termux" width="280"> | <img src="assets/vscode.png" alt="Darkly en VS Code" width="420"> |
+<p align="center">
+  <img src="assets/termux.jpeg" alt="Darkly en Termux" width="300">
+</p>
 
 ## ⌨️ Comandos Go
 
