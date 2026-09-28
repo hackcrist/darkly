@@ -27,16 +27,17 @@ Colección educativa de herramientas de **Linux, redes y seguridad**, en españo
 ## 🚀 Uso rápido
 
 ```bash
+# 1) Python (requerido) — desde la carpeta DARKY
 pip install -r requirements.txt
 python darkly.py            # menú interactivo
 python darkly.py --version  # ver versión
 
+# 2) Go (opcional, activa los módulos rápidos)
 cd go
-go build -o darkly-go.exe . # versión Go standalone
-./darkly-go.exe menu
+go build -o darkly-go.exe . # compila el binario
+./darkly-go.exe menu        # menú 100% en Go
 ```
 
-Menú: `1) Redes  2) Seguridad  3) Recolección  4) Sistema  5) IP`.
 
 <p align="center">
   <img src="assets/demo.svg" alt="Menú Darkly Tools" width="520">
