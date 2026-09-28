@@ -63,6 +63,20 @@ go build -o darkly-go.exe . # compila el binario
 
 Más: `ping subnet traceroute hash hashid pass genpass breach headers urlscan ptr rdap whois dnsrecords subdomains ghuser sysinfo filehash verify version`.
 
+## 📱 Termux (Android)
+
+Instala Termux desde **F-Droid o GitHub** (no Play Store, está desactualizado), clona y corre:
+
+```bash
+pkg install git -y
+git clone https://github.com/hackcrist/darkly.git
+cd darkly
+bash install-termux.sh
+python darkly.py
+```
+
+El instalador pone Python, Go, ping, traceroute y compila `darkly-go` solo. Sin root funciona todo menos algunos modos de traceroute.
+
 ## 📁 Estructura
 
 ```
