@@ -46,8 +46,14 @@ go build -o darkly-go.exe . # compila el binario
 
 
 <p align="center">
-  <img src="assets/demo.svg" alt="Menú Darkly Tools" width="520">
+  <img src="assets/windows-terminal.png" alt="Darkly en Windows Terminal" width="700">
 </p>
+
+## 📸 Capturas reales
+
+| Termux (Android) | VS Code |
+|---|---|
+| <img src="assets/termux.jpeg" alt="Darkly en Termux" width="280"> | <img src="assets/vscode.png" alt="Darkly en VS Code" width="420"> |
 
 ## ⌨️ Comandos Go
 
