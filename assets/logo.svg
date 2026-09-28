@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="300" viewBox="0 0 800 300">
+  <defs>
+    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#00ffea"/>
+      <stop offset="0.5" stop-color="#b026ff"/>
+      <stop offset="1" stop-color="#ff00ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="300" rx="18" fill="#0a0a14"/>
+  <text x="400" y="140" text-anchor="middle" font-family="Consolas, monospace" font-size="84" font-weight="bold" fill="url(#neon)" letter-spacing="8">DARKLY</text>
+  <text x="400" y="190" text-anchor="middle" font-family="Consolas, monospace" font-size="22" fill="#e8e8f0">Herramientas de Linux y Seguridad</text>
+  <text x="400" y="225" text-anchor="middle" font-family="Consolas, monospace" font-size="16" fill="#ffe600">Python + Go · Solo fines educativos</text>
+  <text x="400" y="260" text-anchor="middle" font-family="Consolas, monospace" font-size="14" fill="#888888">by Crist Code · v2.0</text>
+</svg>

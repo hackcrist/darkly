@@ -1,5 +1,9 @@
 # Darkly Tools
 
+<p align="center">
+  <img src="assets/logo.svg" alt="Darkly Tools" width="600">
+</p>
+
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Go](https://img.shields.io/badge/Go-1.21%2B-00ADD8?style=flat-square&logo=go&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
@@ -33,6 +37,10 @@ go build -o darkly-go.exe . # versión Go standalone
 ```
 
 Menú: `1) Redes  2) Seguridad  3) Recolección  4) Sistema  5) IP`.
+
+<p align="center">
+  <img src="assets/demo.svg" alt="Menú Darkly Tools" width="520">
+</p>
 
 ## 📁 Estructura
 
