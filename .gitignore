@@ -1,0 +1,17 @@
+# Reportes generados por cada usuario (se auto-crean al usar el programa)
+reportes/
+
+# Binarios compilados (cada quien compila con: cd go && go build -o darkly-go.exe .)
+go/darkly-go
+go/darkly-go.exe
+
+# Cachés de Python
+__pycache__/
+*/__pycache__/
+*.pyc
+
+# Entornos y sistema
+.venv/
+.env
+.DS_Store
+Thumbs.db
