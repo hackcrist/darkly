@@ -60,12 +60,3 @@ reportes/            # se auto-crea al usarlo (no se sube a git)
 ## 👤 Autor
 
 **Crist Code** — https://github.com/hackcrist/darkly
-
-## 🖼️ Galería
-
-<p align="center">
-  <img src="assets/hero.svg" alt="Hero" width="700"><br>
-  <img src="assets/badge.svg" alt="Insignia" width="200">
-  <img src="assets/features.svg" alt="Módulos" width="700"><br>
-  <img src="assets/arch.svg" alt="Arquitectura" width="700">
-</p>
