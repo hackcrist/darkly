@@ -10,6 +10,9 @@ __pycache__/
 */__pycache__/
 *.pyc
 
+# Logs de pruebas locales
+*.log
+
 # Entornos y sistema
 .venv/
 .env

@@ -52,6 +52,10 @@ go build -o darkly-go.exe . # compila el binario
 ## 📸 Capturas reales
 
 <p align="center">
+  <img src="assets/web.png" alt="Darkly Web" width="700">
+</p>
+
+<p align="center">
   <img src="assets/termux.jpeg" alt="Darkly en Termux" width="300">
 </p>
 
