@@ -68,14 +68,14 @@ Más: `ping subnet traceroute hash hashid pass genpass breach headers urlscan pt
 Instala Termux desde **F-Droid o GitHub** (no Play Store, está desactualizado), clona y corre:
 
 ```bash
-pkg install git -y
+pkg install git python -y
 git clone https://github.com/hackcrist/darkly.git
 cd darkly
-bash install-termux.sh
+python install.py
 python darkly.py
 ```
 
-El instalador pone Python, Go, ping, traceroute y compila `darkly-go` solo. Sin root funciona todo menos algunos modos de traceroute.
+El instalador detecta Termux/Linux/Windows, pone dependencias, pip y compila `darkly-go` solo. Sin root funciona todo menos algunos modos de traceroute.
 
 ## 📁 Estructura
 
