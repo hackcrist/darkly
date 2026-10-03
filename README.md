@@ -161,6 +161,7 @@ install.py           # instalador multiplataforma (Termux/Linux/Windows)
 webapp.py + web/     # API + web pública (Flask, segura por defecto)
 tools/               # networking, security, gathering, username, system_tools, reporter, gospeed
 go/                  # darkly-go v2.1 con los mismos módulos en Go
+docs/                # manuales en español (instalación, uso, API, Go, reportes, FAQ)
 reportes/            # se auto-crea al usarlo (no se sube a git)
 assets/              # logo y capturas del README
 ```
