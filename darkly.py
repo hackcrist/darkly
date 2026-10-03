@@ -421,17 +421,20 @@ def resolve_ip_input(s: str) -> tuple[str, str]:
     s = s.strip()
     if not s:
         raise ValueError("Entrada vacía. Vale IP (8.8.8.8) o dominio (google.com).")
+    orig = s
+    if "://" in s or "/" in s:
+        s = networking.validate_target(s)
     import ipaddress as _ip
     try:
         _ip.ip_address(s)
-        return s, s
+        return s, orig
     except ValueError:
         pass
     # Es dominio/nombre: resuelve
     ip = networking.resolve_host(s)
     if ip.startswith("[!]"):
         raise ValueError(f"No se pudo resolver '{s}': {ip}")
-    return ip, s
+    return ip, orig
 
 
 def auto_save_ip(ip: str, nombre: str | None = None, objetivo: str = "") -> tuple[str, str] | tuple[None, None]:

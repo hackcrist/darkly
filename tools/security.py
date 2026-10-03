@@ -82,6 +82,7 @@ def check_security_headers(url: str, timeout: int = 10) -> dict:
 
 
 _range_cache: dict[str, str] = {}
+_MAX_RANGE_CACHE = 256
 
 
 def _fetch_range(prefix: str, timeout: int = 10) -> str:
@@ -98,6 +99,8 @@ def _fetch_range(prefix: str, timeout: int = 10) -> str:
         ctx = _ssl.create_default_context()
     with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
         body = r.read().decode()
+    if len(_range_cache) >= _MAX_RANGE_CACHE:
+        _range_cache.pop(next(iter(_range_cache)), None)
     _range_cache[prefix] = body
     return body
 
@@ -164,7 +167,7 @@ def scan_url(url: str) -> dict:
         p = urllib.parse.urlparse(original)
     except Exception as e:
         raise ValueError(f"URL no válida: {e}")
-    host = (p.hostname or "").lower()
+    host = (p.hostname or "").lower().rstrip(".")
     findings: list[str] = []
     risk = 0
     if not host:
@@ -193,8 +196,11 @@ def scan_url(url: str) -> dict:
         findings.append(f"TLD sospechoso: .{parts[-1]}")
         risk += 15
     low = original.lower()
+    main_domain = ".".join(parts[-2:]) if len(parts) >= 2 else host
     for w in SUSPICIOUS_WORDS:
         if w in low:
+            if w in ("paypal", "bank") and (main_domain == f"{w}.com" or main_domain.endswith(f".{w}.com") or main_domain.startswith(f"{w}.")):
+                continue
             findings.append(f"Palabra '{w}' muy usada en phishing")
             risk += 5
             break

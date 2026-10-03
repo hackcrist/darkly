@@ -85,6 +85,12 @@ def port_scan(host: str, ports: list[int], timeout: float = 1.0, workers: int = 
 
 def banner_grab(host: str, port: int, timeout: float = 3.0) -> str:
     """Precisión real: conecta y lee el banner del servicio (sin exploits)."""
+    try:
+        port = int(port)
+        if not (1 <= port <= 65535):
+            return "puerto fuera de rango (1-65535)"
+    except (ValueError, TypeError):
+        return "puerto no válido"
     ip = host.strip()
     try:
         ipaddress.ip_address(ip)
@@ -107,7 +113,9 @@ def banner_grab(host: str, port: int, timeout: float = 3.0) -> str:
             if not data:
                 return "abierto (sin banner)"
             txt = data.decode(errors="replace").strip().splitlines()
-            return (txt[0] if txt else "abierto (banner vacío)")[:200]
+            raw_line = txt[0] if txt else ""
+            clean_line = "".join(c for c in raw_line if (ord(c) >= 32 and ord(c) != 127) or c in "\t")
+            return (clean_line if clean_line else "abierto (banner vacío)")[:200]
     except (socket.timeout, ConnectionRefusedError):
         return "cerrado/filtrado"
     except Exception as e:
@@ -123,25 +131,35 @@ def _safe_host(host: str) -> str:
     return host
 
 
-def _decode_console(data: bytes) -> str:
-    """Decodifica salida de ping/tracert: UTF-8 si es válida, si no codepage OEM.
+_cached_oem_cp = None
 
-    ping/tracert escriben en OEM (ej. cp850) aunque vayan por pipe.
-    """
+
+def _decode_console(data: bytes) -> str:
+    """Decodifica salida de ping/tracert: UTF-8 si es válida, si no codepage OEM."""
+    global _cached_oem_cp
     try:
         return data.decode("utf-8")
     except UnicodeDecodeError:
         pass
     if os.name == "nt":
+        if _cached_oem_cp:
+            return data.decode(_cached_oem_cp, errors="replace")
         try:
-            out = subprocess.run(["cmd", "/c", "chcp"], capture_output=True, timeout=10)
-            import re as _re
-            nums = _re.findall(r"\d+", (out.stdout or b"").decode(errors="replace"))
-            cp = nums[-1] if nums else "850"
-            return data.decode(f"cp{cp}", errors="replace")
+            import ctypes
+            cp = ctypes.windll.kernel32.GetOEMCP()
+            _cached_oem_cp = f"cp{cp}"
+            return data.decode(_cached_oem_cp, errors="replace")
         except Exception:
-            pass
-        return data.decode("cp850", errors="replace")
+            try:
+                out = subprocess.run(["cmd", "/c", "chcp"], capture_output=True, timeout=5)
+                import re as _re
+                nums = _re.findall(r"\d+", (out.stdout or b"").decode(errors="replace"))
+                cp = nums[-1] if nums else "850"
+                _cached_oem_cp = f"cp{cp}"
+                return data.decode(_cached_oem_cp, errors="replace")
+            except Exception:
+                _cached_oem_cp = "cp850"
+                return data.decode("cp850", errors="replace")
     return data.decode(errors="replace")
 
 
@@ -172,17 +190,25 @@ def parse_ports(port_str: str) -> list[int]:
             continue
         if "-" in part:
             a, b = part.split("-", 1)
-            start, end = int(a), int(b)
+            try:
+                start, end = int(a.strip()), int(b.strip())
+            except ValueError:
+                raise ValueError(f"Rango numérico no válido: {part}")
             if not (1 <= start <= 65535 and 1 <= end <= 65535 and start <= end):
                 raise ValueError(f"Rango no válido: {part}")
             if end - start > 1024:
                 raise ValueError("Rango muy grande (máx 1024 puertos por escaneo)")
             ports.update(range(start, end + 1))
         else:
-            p = int(part)
+            try:
+                p = int(part)
+            except ValueError:
+                raise ValueError(f"Puerto numérico no válido: {part}")
             if not 1 <= p <= 65535:
                 raise ValueError(f"Puerto no válido: {part}")
             ports.add(p)
+        if len(ports) > 1024:
+            raise ValueError("Demasiados puertos en total (máx 1024 puertos por escaneo)")
     return sorted(ports)
 
 
@@ -190,7 +216,12 @@ def validate_target(host: str) -> str:
     host = host.strip()
     if not host:
         raise ValueError("Host vacío")
-    # El llamador debe confirmar la autorización igualmente
+    # Limpia esquemas (http://, https://), rutas y puertos si el usuario pegó una URL
+    if "://" in host:
+        host = host.split("://", 1)[1]
+    host = host.split("/")[0].split(":")[0].strip()
+    if not host:
+        raise ValueError("Host no válido tras limpiar la URL")
     return host
 
 
@@ -217,21 +248,40 @@ def traceroute(host: str, max_hops: int = 20, timeout: int = 2) -> str:
 
 
 def subnet_info(cidr: str) -> dict:
-    """Calcula datos de red desde un CIDR como 192.168.1.0/24 o 10.0.0.5/16."""
+    """Calcula datos de red desde un CIDR como 192.168.1.0/24 o 10.0.0.5/16 de forma segura y matemática."""
     cidr = cidr.strip()
     try:
         net = ipaddress.ip_network(cidr, strict=False)
     except ValueError as e:
         raise ValueError(f"CIDR no válido '{cidr}': {e}")
-    hosts = list(net.hosts())
+    total = net.num_addresses
+    if net.version == 4:
+        if net.prefixlen == 32:
+            usable = 1
+            first_host = str(net.network_address)
+            last_host = str(net.network_address)
+        elif net.prefixlen == 31:
+            usable = 2
+            first_host = str(net.network_address)
+            last_host = str(net.network_address + 1)
+        else:
+            usable = max(total - 2, 0)
+            first_host = str(net.network_address + 1) if usable > 0 else "n/a"
+            last_host = str(net.broadcast_address - 1) if usable > 0 else "n/a"
+        broadcast = str(net.broadcast_address)
+    else:
+        usable = total
+        first_host = str(net.network_address)
+        last_host = "n/a (IPv6)"
+        broadcast = "n/a (IPv6)"
     return {
         "network": str(net.network_address),
-        "broadcast": str(net.broadcast_address) if net.version == 4 else "n/a (IPv6)",
+        "broadcast": broadcast,
         "netmask": str(net.netmask),
         "prefix": net.prefixlen,
-        "total_addresses": net.num_addresses,
-        "usable_hosts": len(hosts),
-        "first_host": str(hosts[0]) if hosts else "n/a",
-        "last_host": str(hosts[-1]) if hosts else "n/a",
+        "total_addresses": total,
+        "usable_hosts": usable,
+        "first_host": first_host,
+        "last_host": last_host,
         "version": f"IPv{net.version}",
     }

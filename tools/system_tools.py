@@ -41,6 +41,8 @@ def try_psutil_stats() -> dict:
 
 def file_hash(path: str, algo: str = "sha256") -> dict:
     """Calcula el hash de un archivo local por partes (verificar descargas / integridad)."""
+    if not os.path.isfile(path):
+        raise ValueError(f"El archivo no existe o no es un archivo regular: {path}")
     import hashlib as _hl
     algo = algo.lower().replace("-", "")
     if algo not in _hl.algorithms_available:
@@ -102,6 +104,8 @@ def list_processes(limit: int = 15) -> list[dict]:
 
 
 def check_permissions(path: str) -> dict:
+    if not os.path.exists(path):
+        raise ValueError(f"La ruta no existe: {path}")
     st = os.stat(path)
     return {"path": os.path.abspath(path), "mode_octal": oct(st.st_mode & 0o777),
             "uid": getattr(st, "st_uid", "n/a"), "gid": getattr(st, "st_gid", "n/a"),
@@ -111,9 +115,18 @@ def check_permissions(path: str) -> dict:
 def tail_log(path: str, lines: int = 20) -> list[str]:
     if not 1 <= lines <= 200:
         raise ValueError("lines must be 1-200")
-    with open(path, encoding="utf-8", errors="replace") as f:
-        data = f.readlines()
-    return [l.rstrip("\n") for l in data[-lines:]]
+    if not os.path.isfile(path):
+        raise ValueError(f"El archivo no existe o no es regular: {path}")
+    size = os.path.getsize(path)
+    # Si el archivo es grande (>256KB), lee solo el bloque final para no agotar memoria
+    chunk_size = min(size, max(256 * 1024, lines * 2048))
+    with open(path, "rb") as f:
+        if size > chunk_size:
+            f.seek(size - chunk_size)
+        raw = f.read()
+    txt = raw.decode("utf-8", errors="replace")
+    data = txt.splitlines()
+    return data[-lines:]
 
 
 def file_hash_verify(path: str, esperado: str, algo: str = "sha256") -> dict:

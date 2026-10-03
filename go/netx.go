@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -67,43 +68,60 @@ func subnetCore(cidr string) (map[string]any, error) {
 		return nil, fmt.Errorf("CIDR no válido '%s': %v", cidr, err)
 	}
 	ones, bits := ipnet.Mask.Size()
-	total := uint64(1) << uint(bits-ones)
 	maskStr := net.IP(ipnet.Mask).String()
 	ver := "IPv4"
 	if ip.To4() == nil {
 		ver = "IPv6"
 	}
 	out := map[string]any{
-		"network":          ipnet.IP.String(),
-		"netmask":          maskStr,
-		"prefix":           ones,
-		"total_addresses":  total,
-		"version":          ver,
+		"network": ipnet.IP.String(),
+		"netmask": maskStr,
+		"prefix":  ones,
+		"version": ver,
 	}
 	if ver == "IPv4" {
+		total := uint64(1) << uint(bits-ones)
+		out["total_addresses"] = total
 		base := ipToUint32(ipnet.IP.To4())
 		m := ipToUint32(net.IP(ipnet.Mask).To4())
-		bc := net.IPv4(byte(base>>24), byte(base>>16), byte(base>>8), byte(base))
-		_ = bc
 		bcast := base | ^m
 		out["broadcast"] = uint32ToIP(bcast).String()
-		var usable uint64
-		if total >= 2 {
-			usable = total - 2
-		}
-		out["usable_hosts"] = usable
-		if usable > 0 {
-			out["first_host"] = uint32ToIP(base + 1).String()
-			out["last_host"] = uint32ToIP(bcast - 1).String()
+		if ones == 32 {
+			out["usable_hosts"] = uint64(1)
+			out["first_host"] = ipnet.IP.String()
+			out["last_host"] = ipnet.IP.String()
+		} else if ones == 31 {
+			out["usable_hosts"] = uint64(2)
+			out["first_host"] = ipnet.IP.String()
+			out["last_host"] = uint32ToIP(base + 1).String()
 		} else {
-			out["first_host"] = "n/a"
-			out["last_host"] = "n/a"
+			var usable uint64
+			if total >= 2 {
+				usable = total - 2
+			}
+			out["usable_hosts"] = usable
+			if usable > 0 {
+				out["first_host"] = uint32ToIP(base + 1).String()
+				out["last_host"] = uint32ToIP(bcast - 1).String()
+			} else {
+				out["first_host"] = "n/a"
+				out["last_host"] = "n/a"
+			}
 		}
 	} else {
 		out["broadcast"] = "n/a (IPv6)"
-		out["usable_hosts"] = total
 		out["first_host"] = ipnet.IP.String()
 		out["last_host"] = "n/a (IPv6)"
+		diff := bits - ones
+		if diff < 64 {
+			total := uint64(1) << uint(diff)
+			out["total_addresses"] = total
+			out["usable_hosts"] = total
+		} else {
+			bi := new(big.Int).Lsh(big.NewInt(1), uint(diff))
+			out["total_addresses"] = bi.String()
+			out["usable_hosts"] = bi.String()
+		}
 	}
 	return out, nil
 }

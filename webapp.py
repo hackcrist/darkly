@@ -20,19 +20,41 @@ app = Flask(__name__, static_folder="web", static_url_path="")
 
 TOKEN = os.environ.get("DARKLY_TOKEN", "")
 ENABLE_SCAN = os.environ.get("ENABLE_SCAN", "0") == "1"
+RATE_LIMIT_ENABLED = os.environ.get("RATE_LIMIT_ENABLED", "1") == "1"
+TRUST_PROXY = os.environ.get("TRUST_PROXY", "0") == "1"
 
-# Límite simple en memoria: {ip: [timestamps]}
+# Límite simple en memoria con limpieza automática: {ip: [timestamps]}
 _hits: dict[str, list[float]] = {}
 _lock = threading.Lock()
+_last_cleanup = time.time()
+
+
+def _get_client_ip() -> str:
+    """Extrae la IP real de forma segura según configuración de proxy."""
+    if TRUST_PROXY:
+        xff = request.headers.get("X-Forwarded-For", "")
+        if xff:
+            return xff.split(",")[0].strip()
+    return request.remote_addr or "127.0.0.1"
 
 
 def limited(per_min=30):
     def deco(fn):
         @wraps(fn)
         def wrapper(*a, **kw):
-            ip = request.headers.get("X-Forwarded-For", request.remote_addr or "?").split(",")[0].strip()
+            if not RATE_LIMIT_ENABLED:
+                return fn(*a, **kw)
+            ip = _get_client_ip()
             now = time.time()
+            global _last_cleanup
             with _lock:
+                # Limpieza periódica cada 120s para evitar fugas de memoria
+                if now - _last_cleanup > 120:
+                    dead = [k for k, v in _hits.items() if not v or (now - v[-1] >= 60)]
+                    for k in dead:
+                        _hits.pop(k, None)
+                    _last_cleanup = now
+
                 ts = [t for t in _hits.get(ip, []) if now - t < 60]
                 if len(ts) >= per_min:
                     return jsonify({"error": "Límite excedido (demasiadas peticiones). Espera un minuto."}), 429
@@ -46,10 +68,34 @@ def limited(per_min=30):
 def need_token(fn):
     @wraps(fn)
     def wrapper(*a, **kw):
-        if TOKEN and request.headers.get("X-Token", "") != TOKEN:
-            return jsonify({"error": "Requiere token (cabecera X-Token)."}), 401
+        # Si requiere token, debe existir DARKLY_TOKEN configurado y coincidir
+        req_token = request.headers.get("X-Token", "").strip()
+        if not TOKEN or req_token != TOKEN:
+            return jsonify({"error": "Requiere token de acceso válido (cabecera X-Token). Configura DARKLY_TOKEN en el servidor."}), 401
         return fn(*a, **kw)
     return wrapper
+
+
+@app.before_request
+def handle_options():
+    if request.method == "OPTIONS":
+        return "", 204
+
+
+@app.after_request
+def add_security_and_cors(response):
+    response.headers["Access-Control-Allow-Origin"] = os.environ.get("CORS_ORIGIN", "*")
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Token"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
+@app.route("/api/health", methods=["GET"])
+def api_health():
+    return jsonify({"status": "ok", "scan_enabled": ENABLE_SCAN, "rate_limited": RATE_LIMIT_ENABLED})
 
 
 @app.get("/")
@@ -130,6 +176,8 @@ def api_hash():
     algo = request.args.get("algo", "sha256")
     if not text:
         return jsonify({"error": "Falta ?text="}), 400
+    if len(text) > 65536:
+        return jsonify({"error": "Texto demasiado largo (máx 64KB)."}), 400
     try:
         return jsonify({"algo": algo, "hex": security.hash_text(text, algo)})
     except Exception as e:
@@ -178,8 +226,10 @@ def api_user():
 def api_breach():
     data = request.get_json(silent=True) or {}
     pw = data.get("password", "")
-    if not pw:
-        return jsonify({"error": "Manda JSON {\"password\": \"...\"}"}), 400
+    if not isinstance(pw, str) or not pw:
+        return jsonify({"error": "Manda JSON con campo 'password' de tipo string no vacío"}), 400
+    if len(pw) > 1024:
+        return jsonify({"error": "Contraseña demasiado larga (máx 1024 caracteres)"}), 400
     r = security.check_password_breach(pw)
     del pw
     return jsonify(r)
@@ -201,6 +251,8 @@ def api_scan():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
     res = networking.port_scan(host, plist)
+    if "error" in res:
+        return jsonify({"error": str(res["error"])}), 400
     out = {}
     for p, is_open in res.items():
         if p == "error":

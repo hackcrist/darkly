@@ -201,31 +201,33 @@ def http_headers(url: str, timeout: int = 10) -> dict:
     url = url.strip()
     if not url:
         raise ValueError("URL vacía")
-    if not url.startswith(("http://", "https://")):
-        url = "https://" + url
-    import ssl as _ssl
-    try:
-        import certifi
-        ctx = _ssl.create_default_context(cafile=certifi.where())
-    except ImportError:
-        ctx = _ssl.create_default_context()
-    # 1) Intento HEAD rápido
-    for method in ("HEAD", "GET"):
-        try:
-            req = urllib.request.Request(url, method=method, headers={"User-Agent": "Darkly-Tools/1.0 (educativo)"})
-            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
-                h = dict(r.headers)
-                h["_url_final"] = r.geturl()
-                h["_metodo"] = method
-                return h
-        except Exception as e:
-            ultimo = e
-            continue
-    return {"error": f"No se pudo obtener cabeceras: {ultimo}. Prueba con http:// en vez de https://."}
+    
+    schemes_to_try = []
+    if url.startswith(("http://", "https://")):
+        schemes_to_try.append(url)
+    else:
+        schemes_to_try.append("https://" + url)
+        schemes_to_try.append("http://" + url)
+
+    ctx = _ssl_ctx()
+    ultimo = "sin respuesta"
+    for target_url in schemes_to_try:
+        for method in ("HEAD", "GET"):
+            try:
+                req = urllib.request.Request(target_url, method=method, headers={"User-Agent": "Darkly-Tools/2.0 (educativo)"})
+                with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+                    h = dict(r.headers)
+                    h["_url_final"] = r.geturl()
+                    h["_metodo"] = method
+                    return h
+            except Exception as e:
+                ultimo = e
+                continue
+    return {"error": f"No se pudo obtener cabeceras: {ultimo}. Verifica el host o tu conexión."}
 
 
 def rdap_lookup(query: str, timeout: int = 12) -> dict:
-    """RDAP por HTTPS (puerto 443): reemplazo moderno y preciso de WHOIS (que falla si bloquean puerto 43)."""
+    """RDAP por HTTPS (puerto 443): estándar global y preciso con redirección universal autoritativa."""
     import json as _json
     import urllib.request as _req
     import urllib.parse as _parse
@@ -233,32 +235,51 @@ def rdap_lookup(query: str, timeout: int = 12) -> dict:
     q = query.strip().lower().rstrip(".")
     if not q:
         raise ValueError("Consulta vacía")
+    # Limpia protocolos si se pegó una URL
+    if "://" in q:
+        q = q.split("://", 1)[1]
+    q = q.split("/")[0].split(":")[0].strip()
+
+    is_ip = False
     try:
         _ip.ip_address(q)
-        url = f"https://rdap.db.ripe.net/ip/{_parse.quote(q)}"
+        is_ip = True
     except ValueError:
+        pass
+
+    urls_to_try = []
+    if is_ip:
+        urls_to_try.append(f"https://rdap.org/ip/{_parse.quote(q)}")
+        urls_to_try.append(f"https://rdap.db.ripe.net/ip/{_parse.quote(q)}")
+        urls_to_try.append(f"https://rdap.arin.net/registry/ip/{_parse.quote(q)}")
+    else:
         if "." in q:
-            # Dominio: usa RDAP de Verisign para .com/.net, si no IANA bootstrap
+            urls_to_try.append(f"https://rdap.org/domain/{_parse.quote(q)}")
             if q.endswith((".com", ".net")):
-                url = f"https://rdap.verisign.com/com/v1/domain/{_parse.quote(q)}"
-            else:
-                url = f"https://data.iana.org/rdap/domain/{_parse.quote(q)}"
+                urls_to_try.append(f"https://rdap.verisign.com/com/v1/domain/{_parse.quote(q)}")
         else:
-            raise ValueError("Dame un dominio (ej. google.com) o IP (ej. 8.8.8.8)")
-    try:
-        rq = _req.Request(url, headers={"Accept": "application/json", "User-Agent": "Darkly-Tools/1.0 (educativo)"})
-        with _req.urlopen(rq, timeout=timeout, context=_ssl_ctx()) as r:
-            data = _json.loads(r.read().decode())
-        # Resumen preciso
-        resumen = {"fuente": url, "nombre": data.get("name") or data.get("ldhName"),
-                   "estado": data.get("status"), "registros": len(data.get("entities", []))}
-        # Fecha de creación/expiración si existe
-        for ev in data.get("events", []):
-            if ev.get("eventAction") in ("registration", "expiration"):
-                resumen[ev["eventAction"]] = ev.get("eventDate")
-        return resumen
-    except Exception as e:
-        return {"error": f"RDAP falló: {e}. Prueba con otro dominio o revisa tu conexión."}
+            raise ValueError("Dame un dominio (ej. google.com, wikipedia.org) o IP (ej. 8.8.8.8)")
+
+    last_error = None
+    for url in urls_to_try:
+        try:
+            rq = _req.Request(url, headers={"Accept": "application/json, application/rdap+json",
+                                            "User-Agent": "Darkly-Tools/2.0 (educativo)"})
+            with _req.urlopen(rq, timeout=timeout, context=_ssl_ctx()) as r:
+                data = _json.loads(r.read().decode())
+            # Resumen preciso
+            resumen = {"fuente": r.geturl(), "nombre": data.get("name") or data.get("ldhName") or data.get("handle"),
+                       "estado": data.get("status"), "registros": len(data.get("entities", []))}
+            # Fecha de creación/expiración si existe
+            for ev in data.get("events", []):
+                if ev.get("eventAction") in ("registration", "expiration", "last changed"):
+                    resumen[ev["eventAction"]] = ev.get("eventDate")
+            return resumen
+        except Exception as e:
+            last_error = e
+            continue
+
+    return {"error": f"RDAP falló: {last_error}. Prueba con otro dominio/IP o revisa tu conexión."}
 
 
 def reverse_dns(ip: str, timeout: int = 8) -> str:
@@ -347,8 +368,10 @@ def whois_lookup(query: str, timeout: int = 10) -> str:
             refer = line.split(":", 1)[1].strip()
             break
     if refer:
-        try:
-            resp += f"\n\n--- referencia: {refer} ---\n" + _ask(refer, query)
-        except Exception as e:
-            resp += f"\n[!] referencia {refer} falló: {e}"
+        refer = refer.split("/")[0].split(":")[0].strip()
+        if refer and _re.match(r"^[a-zA-Z0-9.\-]+$", refer) and refer.lower() != "whois.iana.org":
+            try:
+                resp += f"\n\n--- referencia: {refer} ---\n" + _ask(refer, query)
+            except Exception as e:
+                resp += f"\n[!] referencia {refer} falló: {e}"
     return resp[:8000]

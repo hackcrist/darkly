@@ -187,6 +187,7 @@ func cmdGenPass(args []string) {
 
 var rangeCache = map[string]string{}
 var rangeMu sync.Mutex
+const maxRangeCache = 256
 
 func fetchRange(prefix string) (string, error) {
 	rangeMu.Lock()
@@ -216,6 +217,12 @@ func fetchRange(prefix string) (string, error) {
 	}
 	body := string(buf)
 	rangeMu.Lock()
+	if len(rangeCache) >= maxRangeCache {
+		for k := range rangeCache {
+			delete(rangeCache, k)
+			break
+		}
+	}
 	rangeCache[prefix] = body
 	rangeMu.Unlock()
 	return body, nil
@@ -299,26 +306,31 @@ func headersCore(rawurl string) map[string]any {
 	if rawurl == "" {
 		return map[string]any{"error": "URL vacía"}
 	}
-	if !strings.HasPrefix(rawurl, "http://") && !strings.HasPrefix(rawurl, "https://") {
-		rawurl = "https://" + rawurl
+	var toTry []string
+	if strings.HasPrefix(rawurl, "http://") || strings.HasPrefix(rawurl, "https://") {
+		toTry = append(toTry, rawurl)
+	} else {
+		toTry = append(toTry, "https://"+rawurl, "http://"+rawurl)
 	}
-	for _, method := range []string{"HEAD", "GET"} {
-		req, _ := http.NewRequest(method, rawurl, nil)
-		req.Header.Set("User-Agent", "darkly-go/2.1 (educativo)")
-		resp, err := httpClient.Do(req)
-		if err != nil {
-			continue
+	for _, target := range toTry {
+		for _, method := range []string{"HEAD", "GET"} {
+			req, _ := http.NewRequest(method, target, nil)
+			req.Header.Set("User-Agent", "darkly-go/2.1 (educativo)")
+			resp, err := httpClient.Do(req)
+			if err != nil {
+				continue
+			}
+			out := map[string]any{}
+			for k, v := range resp.Header {
+				out[k] = strings.Join(v, "; ")
+			}
+			out["_url_final"] = resp.Request.URL.String()
+			out["_metodo"] = method
+			resp.Body.Close()
+			return out
 		}
-		out := map[string]any{}
-		for k, v := range resp.Header {
-			out[k] = strings.Join(v, "; ")
-		}
-		out["_url_final"] = resp.Request.URL.String()
-		out["_metodo"] = method
-		resp.Body.Close()
-		return out
 	}
-	return map[string]any{"error": "No se pudo obtener cabeceras. Prueba con http:// en vez de https://."}
+	return map[string]any{"error": "No se pudo obtener cabeceras. Verifica el host o tu conexión."}
 }
 
 func cmdHeaders(args []string) {
@@ -352,7 +364,7 @@ func cmdURLScan(args []string) {
 		fmt.Fprintln(os.Stderr, "URL no válida:", err)
 		os.Exit(2)
 	}
-	host := strings.ToLower(u.Hostname())
+	host := strings.TrimRight(strings.ToLower(u.Hostname()), ".")
 	if host == "" {
 		emitJSON(map[string]any{"url": original, "riesgo": 100, "nivel": "Alto", "hallazgos": []string{"No se encontró un host válido"}})
 		return
@@ -385,8 +397,15 @@ func cmdURLScan(args []string) {
 		risk += 15
 	}
 	low := strings.ToLower(original)
+	mainDomain := host
+	if len(parts) >= 2 {
+		mainDomain = strings.Join(parts[len(parts)-2:], ".")
+	}
 	for _, w := range susWords {
 		if strings.Contains(low, w) {
+			if (w == "paypal" || w == "bank") && (mainDomain == w+".com" || strings.HasSuffix(mainDomain, "."+w+".com") || strings.HasPrefix(mainDomain, w+".")) {
+				continue
+			}
 			findings = append(findings, "Palabra '"+w+"' muy usada en phishing")
 			risk += 5
 			break

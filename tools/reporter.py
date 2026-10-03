@@ -217,12 +217,13 @@ def _export_pdf(tag: str, fecha: str, ip: str, objetivo: str, nombre: str, geo: 
         esc = ln.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
         content += f"({esc}) Tj T* "
     content += "ET"
+    content_bytes = content.encode("latin-1", errors="replace")
     objs = [
         "<< /Type /Catalog /Pages 2 0 R >>",
         "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
         "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-        f"<< /Length {len(content)} >>\nstream\n{content}\nendstream",
+        f"<< /Length {len(content_bytes)} >>\nstream\n{content}\nendstream",
     ]
     out = bytearray(b"%PDF-1.4\n")
     offsets = [0]

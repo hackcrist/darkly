@@ -181,36 +181,51 @@ func rdapCore(q string) map[string]any {
 	if q == "" {
 		return map[string]any{"error": "Consulta vacía"}
 	}
-	var u string
+	if strings.Contains(q, "://") {
+		parts := strings.SplitN(q, "://", 2)
+		q = parts[1]
+	}
+	q = strings.Split(q, "/")[0]
+	q = strings.Split(q, ":")[0]
+
+	var urls []string
 	if net.ParseIP(q) != nil {
-		u = "https://rdap.db.ripe.net/ip/" + url.PathEscape(q)
+		urls = []string{
+			"https://rdap.org/ip/" + url.PathEscape(q),
+			"https://rdap.db.ripe.net/ip/" + url.PathEscape(q),
+			"https://rdap.arin.net/registry/ip/" + url.PathEscape(q),
+		}
 	} else if strings.Contains(q, ".") {
+		urls = []string{"https://rdap.org/domain/" + url.PathEscape(q)}
 		if strings.HasSuffix(q, ".com") || strings.HasSuffix(q, ".net") {
-			u = "https://rdap.verisign.com/com/v1/domain/" + url.PathEscape(q)
-		} else {
-			u = "https://data.iana.org/rdap/domain/" + url.PathEscape(q)
+			urls = append(urls, "https://rdap.verisign.com/com/v1/domain/"+url.PathEscape(q))
 		}
 	} else {
 		return map[string]any{"error": "Dame un dominio (ej. google.com) o IP (ej. 8.8.8.8)"}
 	}
-	data, err := getJSON(u, 12*time.Second)
-	if err != nil {
-		return map[string]any{"error": "RDAP falló: " + err.Error()}
-	}
-	out := map[string]any{"fuente": u, "nombre": firstStr(data["name"], data["ldhName"]), "estado": data["status"]}
-	if ents, ok := data["entities"].([]any); ok {
-		out["registros"] = len(ents)
-	}
-	if evs, ok := data["events"].([]any); ok {
-		for _, e := range evs {
-			if m, ok := e.(map[string]any); ok {
-				if m["eventAction"] == "registration" || m["eventAction"] == "expiration" {
-					out[m["eventAction"].(string)] = m["eventDate"]
+
+	var lastErr error
+	for _, u := range urls {
+		data, err := getJSON(u, 12*time.Second)
+		if err == nil {
+			out := map[string]any{"fuente": u, "nombre": firstStr(data["name"], data["ldhName"], data["handle"]), "estado": data["status"]}
+			if ents, ok := data["entities"].([]any); ok {
+				out["registros"] = len(ents)
+			}
+			if evs, ok := data["events"].([]any); ok {
+				for _, e := range evs {
+					if m, ok := e.(map[string]any); ok {
+						if m["eventAction"] == "registration" || m["eventAction"] == "expiration" || m["eventAction"] == "last changed" {
+							out[m["eventAction"].(string)] = m["eventDate"]
+						}
+					}
 				}
 			}
+			return out
 		}
+		lastErr = err
 	}
-	return out
+	return map[string]any{"error": "RDAP falló: " + lastErr.Error()}
 }
 
 func firstStr(v ...any) any {

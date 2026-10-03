@@ -138,6 +138,9 @@ func parsePorts(s string) ([]int, error) {
 				out = append(out, p)
 			}
 		}
+		if len(out) > 2048 {
+			return nil, fmt.Errorf("demasiados puertos en total (máx 2048 puertos por escaneo)")
+		}
 	}
 	sort.Ints(out)
 	return out, nil
