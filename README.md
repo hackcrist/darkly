@@ -4,13 +4,11 @@
   <img src="assets/logo.svg" alt="Darkly Tools" width="600">
 </p>
 
-<p align="center">
-  <img src="assets/badge-python.svg" alt="Python 3.10+">
-  <img src="assets/badge-go.svg" alt="Go 1.21+">
-  <img src="assets/badge-license.svg" alt="License MIT">
-  <img src="assets/badge-version.svg" alt="Version 2.0">
-  <img src="assets/badge-platform.svg" alt="Windows y Linux">
-</p>
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
+![Go](https://img.shields.io/badge/Go-1.21%2B-00ADD8?style=flat-square&logo=go&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
+![Version](https://img.shields.io/badge/Version-2.0-ff00ff?style=flat-square)
+![Platform](https://img.shields.io/badge/Windows%20%7C%20Linux-OK-00ffea?style=flat-square)
 
 Colección de herramientas de redes, seguridad y OSINT pasivo para la terminal, en español y con menús a color. Incluye una implementación en Python (`darkly.py`), su gemela en Go (`darkly-go`) con los mismos módulos, y una API web opcional.
 
