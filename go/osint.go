@@ -48,33 +48,132 @@ func normGeo(data map[string]any) map[string]any {
 			if conn, ok := data["connection"].(map[string]any); ok {
 				data["org"] = firstStr(conn["org"], conn["isp"])
 				data["isp"] = firstStr(conn["isp"])
+				if asn, has := conn["asn"]; has {
+					if n, isNum := asn.(float64); isNum {
+						data["asn"] = fmt.Sprintf("AS%d", int(n))
+					}
+				}
 			}
 		}
+	}
+	if _, has := data["asn"]; !has {
+		// ip-api entrega 'as' = "AS15169 Google LLC"
+		if a, ok := data["as"].(string); ok && strings.TrimSpace(a) != "" {
+			data["asn"] = strings.SplitN(strings.TrimSpace(a), " ", 2)[0]
+		}
+	}
+	// Codigo ISO para comparar entre fuentes (evita "US" vs "United States").
+	if s, ok := firstStr(data["countryCode"], data["country_code"]).(string); ok && s != "" {
+		data["pais_codigo"] = strings.ToUpper(s)
 	}
 	return data
 }
 
+// hostCorto devuelve solo el host de una URL, para mostrar la fuente.
+func hostCorto(u string) string {
+	if i := strings.Index(u, "://"); i >= 0 {
+		u = u[i+3:]
+	}
+	if i := strings.IndexByte(u, '/'); i >= 0 {
+		u = u[:i]
+	}
+	return u
+}
+
+func sortedKeys(m map[string]bool) []string {
+	ks := make([]string, 0, len(m))
+	for k := range m {
+		ks = append(ks, k)
+	}
+	sort.Strings(ks)
+	return ks
+}
+
+// geoCore consulta varias fuentes en paralelo y verifica acuerdos (pais/ASN).
 func geoCore(ip string) map[string]any {
 	ip = strings.TrimSpace(ip)
 	if net.ParseIP(ip) == nil {
 		return map[string]any{"error": fmt.Sprintf("'%s' no es una IP válida (ej. 8.8.8.8)", ip)}
 	}
 	fuentes := []string{
-		"http://ip-api.com/json/" + url.PathEscape(ip) + "?fields=status,message,country,regionName,city,lat,lon,org,isp,query",
+		"http://ip-api.com/json/" + url.PathEscape(ip) + "?fields=status,message,country,countryCode,regionName,city,lat,lon,org,isp,as,query",
 		"https://ipapi.co/" + url.PathEscape(ip) + "/json/",
 		"https://ipwho.is/" + url.PathEscape(ip),
 	}
-	var ultimo string
+	var (
+		mu        sync.Mutex
+		wg        sync.WaitGroup
+		principal map[string]any
+		detalle   []map[string]any
+		errores   []string
+	)
 	for _, u := range fuentes {
-		if data, err := getJSON(u, 10*time.Second); err == nil {
+		wg.Add(1)
+		go func(fuente string) {
+			defer wg.Done()
+			data, err := getJSON(fuente, 10*time.Second)
+			if err != nil {
+				mu.Lock()
+				errores = append(errores, hostCorto(fuente)+": "+err.Error())
+				mu.Unlock()
+				return
+			}
 			data = normGeo(data)
-			data["fuente"] = u
-			return data
-		} else {
-			ultimo = u + ": " + err.Error()
+			nombre := hostCorto(fuente)
+			obs := map[string]any{
+				"fuente":      nombre,
+				"pais":        data["country"],
+				"pais_codigo": data["pais_codigo"],
+				"ciudad":      data["city"],
+				"org":         firstStr(data["org"], data["isp"]),
+				"asn":         data["asn"],
+			}
+			mu.Lock()
+			if principal == nil {
+				principal = data
+				principal["fuente"] = nombre
+			}
+			detalle = append(detalle, obs)
+			mu.Unlock()
+		}(u)
+	}
+	wg.Wait()
+	if principal == nil {
+		return map[string]any{"error": "Todas las fuentes fallaron. " + strings.Join(errores, "; ")}
+	}
+	paises := map[string]bool{}
+	asns := map[string]bool{}
+	for _, d := range detalle {
+		if s, ok := d["pais_codigo"].(string); ok && s != "" {
+			paises[s] = true
+		}
+		if s, ok := d["asn"].(string); ok && s != "" {
+			asns[s] = true
 		}
 	}
-	return map[string]any{"error": "Todas las fuentes fallaron. " + ultimo}
+	if len(paises) == 0 {
+		for _, d := range detalle {
+			if s, ok := d["pais"].(string); ok && s != "" {
+				paises[s] = true
+			}
+		}
+	}
+	avisos := []string{}
+	if len(paises) > 1 {
+		avisos = append(avisos, "Pais distinto entre fuentes: "+strings.Join(sortedKeys(paises), ", "))
+	}
+	if len(asns) > 1 {
+		avisos = append(avisos, "ASN distinto entre fuentes: "+strings.Join(sortedKeys(asns), ", "))
+	}
+	principal["verificacion"] = map[string]any{
+		"fuentes_ok":    len(detalle),
+		"fuentes_error": len(errores),
+		"coincide_pais": len(paises) <= 1,
+		"coincide_asn":  len(asns) <= 1,
+		"avisos":        avisos,
+		"detalle":       detalle,
+	}
+	return principal
 }
 
 func cmdIPInfo(args []string) {
@@ -87,13 +186,13 @@ func cmdIPInfo(args []string) {
 	}
 	if *mia || fs.Arg(0) == "mia" {
 		for _, u := range []string{
-			"http://ip-api.com/json/?fields=status,message,country,regionName,city,query,org,isp",
+			"http://ip-api.com/json/?fields=status,message,country,countryCode,regionName,city,query,org,isp,as",
 			"https://ipapi.co/json/",
 			"https://ipwho.is/json/",
 		} {
 			if data, err := getJSON(u, 10*time.Second); err == nil {
 				data = normGeo(data)
-				data["fuente"] = u
+				data["fuente"] = hostCorto(u)
 				emitJSON(data)
 				return
 			}

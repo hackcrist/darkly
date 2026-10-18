@@ -21,4 +21,4 @@ Esta sección describe las capas del sistema, el flujo de datos entre Python y G
 1. El menú solicita un objetivo (IP o dominio) y lo valida con expresiones regulares.
 2. La herramienta consulta fuentes públicas o el sistema local con tiempos de espera acotados.
 3. El resultado se normaliza a diccionarios con claves estables (`ip`, `country`, `city`, `lat`, `lon`, `org`).
-4. La salida se imprime en tabla y, para IPs, se persiste en `reportes/` en cuatro formatos más índice.
+4. La salida se imprime en tabla y, para IPs, se persiste en `reportes/` en cinco formatos más índice (HTML, TXT, CSV, PDF y JSON de evidencia con SHA-256).

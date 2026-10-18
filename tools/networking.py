@@ -5,6 +5,41 @@ import subprocess
 import ipaddress
 import concurrent.futures
 
+# Puertos conocidos + deteccion de servicio por banner (salida estilo nmap).
+SERVICE_PORTS = {
+    20: "ftp-data", 21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp",
+    53: "domain", 80: "http", 110: "pop3", 143: "imap", 443: "https",
+    445: "microsoft-ds", 587: "submission", 993: "imaps", 995: "pop3s",
+    1433: "ms-sql", 3306: "mysql", 3389: "ms-wbt-server", 5432: "postgresql",
+    5900: "vnc", 6379: "redis", 8000: "http-alt", 8080: "http-alt", 8443: "https-alt",
+}
+
+
+def service_for(port: int, banner: str = "") -> str:
+    """Nombre de servicio aproximado (puerto + banner), al estilo nmap."""
+    if not isinstance(port, int):
+        return "unknown"
+    b = (banner or "").lower()
+    if b.startswith("ssh-") or "openssh" in b:
+        return "ssh"
+    if b.startswith("http/") or "http/" in b:
+        return "http"
+    if "smtp" in b:
+        return "smtp"
+    if "ftp" in b:
+        return "ftp"
+    if "mysql" in b:
+        return "mysql"
+    if "imap" in b:
+        return "imap"
+    if "pop3" in b:
+        return "pop3"
+    if "rdp" in b or "remote desktop" in b:
+        return "ms-wbt-server"
+    if "telnet" in b:
+        return "telnet"
+    return SERVICE_PORTS.get(port, "unknown")
+
 
 def resolve_host(host: str) -> str:
     try:

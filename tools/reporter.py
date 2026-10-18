@@ -1,7 +1,9 @@
-"""Generador de reportes detallados (HTML + TXT + CSV + PDF) en carpeta reportes/."""
+"""Generador de reportes detallados (HTML + TXT + CSV + PDF + JSON) en carpeta reportes/."""
 import os
 import csv
 import html
+import json
+import hashlib
 import datetime
 
 
@@ -21,6 +23,16 @@ def _safe(name: str) -> str:
     return "".join(c if c.isalnum() or c in ("-", "_", ".") else "_" for c in name).strip("_") or "reporte"
 
 
+def _serv(port, valor) -> str:
+    """Servicio aproximado (estilo nmap) desde puerto + banner."""
+    try:
+        from tools import networking
+        banner = "" if valor in ("cerrado", None) else str(valor)
+        return networking.service_for(int(port), banner)
+    except Exception:
+        return "unknown"
+
+
 def _kv_table(data: dict) -> str:
     rows = []
     for k, v in (data or {}).items():
@@ -28,20 +40,42 @@ def _kv_table(data: dict) -> str:
     return "<table>" + "".join(rows) + "</table>" if rows else "<p>Sin datos.</p>"
 
 
-def build_ip_report(ip: str, geo: dict, ptr: str, rdap: dict, nombre: str | None = None, objetivo: str = "", extra: dict | None = None) -> tuple[str, str, str, str]:
+def build_ip_report(ip: str, geo: dict, ptr: str, rdap: dict, nombre: str | None = None, objetivo: str = "", extra: dict | None = None) -> tuple[str, str, str, str, str]:
     """Reporte 10/10: geo + PTR + RDAP + extra(dns, ping, puertos, headers, notas).
-    nombre: etiqueta específica. objetivo: input original."""
+    nombre: etiqueta específica. objetivo: input original. Devuelve (html, txt, csv, pdf, json)."""
     ensure_dir()
     ts = _stamp()
     etiqueta = _safe(nombre) if nombre else _safe(ip)
     tag = f"{etiqueta}_{ts}"
     fecha = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    fecha_utc = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     extra = extra or {}
     dns_d = extra.get("dns", "")
     ping_d = extra.get("ping", "")
     puertos_d = extra.get("puertos", {})
     headers_d = extra.get("headers", {})
     notas_d = extra.get("notas", "")
+    verificacion = geo.get("verificacion") if isinstance(geo, dict) else None
+
+    # ---------- Evidencia JSON + integridad (SHA-256 del propio archivo) ----------
+    evidencia = {
+        "herramienta": "Darkly Tools",
+        "generado_local": fecha,
+        "generado_utc": fecha_utc,
+        "ip": ip,
+        "objetivo": objetivo or ip,
+        "nombre": nombre or "",
+        "geo": geo,
+        "ptr": ptr,
+        "rdap": rdap,
+        "extra": extra,
+        "verificacion": verificacion,
+    }
+    evidencia_txt = json.dumps(evidencia, ensure_ascii=False, indent=2, default=str)
+    sha = hashlib.sha256(evidencia_txt.encode("utf-8")).hexdigest()
+    json_path = os.path.join(BASE_DIR, f"reporte_IP_{tag}.json")
+    with open(json_path, "wb") as f:
+        f.write(evidencia_txt.encode("utf-8"))
 
     def _sec(t: str, cuerpo: str) -> str:
         return f"{'-' * 60}\n{t}\n{'-' * 60}\n{cuerpo}\n"
@@ -58,7 +92,10 @@ def build_ip_report(ip: str, geo: dict, ptr: str, rdap: dict, nombre: str | None
             f.write(f"Objetivo original: {objetivo}\n")
         if nombre:
             f.write(f"Nombre reporte: {nombre}\n")
-        f.write(f"Metodo: geo multi-fuente + PTR + RDAP HTTPS + ping + top-puertos + headers\n\n")
+        f.write("Metodo: geo multi-fuente + PTR + RDAP HTTPS + ping + top-puertos + headers\n")
+        f.write(f"Generado (UTC): {fecha_utc}\n")
+        f.write(f"Evidencia JSON: {os.path.basename(json_path)}\n")
+        f.write(f"SHA-256 (evidencia): {sha}\n\n")
         gtxt = "\n".join(f"{k:>15} : {v}" for k, v in (geo.items() if isinstance(geo, dict) else {"dato": geo}.items()))
         f.write(_sec("[1] GEOLOCALIZACION / PROVEEDOR", gtxt))
         f.write(_sec("[2] DNS INVERSO (PTR)", str(ptr)))
@@ -67,7 +104,10 @@ def build_ip_report(ip: str, geo: dict, ptr: str, rdap: dict, nombre: str | None
         f.write(_sec("[4] DNS DIRECTO / RESOLUCION", str(dns_d) if dns_d else "No recolectado (informe rapido)"))
         f.write(_sec("[5] PING / LATENCIA", str(ping_d)[:1500] if ping_d else "No recolectado (informe rapido)"))
         if puertos_d:
-            ptxt = "\n".join(f"puerto {p:<5}: {v}" for p, v in sorted(puertos_d.items(), key=lambda kv: str(kv[0])))
+            ptxt = "\n".join(
+                f"puerto {str(p):<5} {_serv(p, v):<15}: {v}"
+                for p, v in sorted(puertos_d.items(), key=lambda kv: int(kv[0]) if str(kv[0]).isdigit() else 0)
+            )
         else:
             ptxt = "No recolectado (informe rapido). Usa opcion 5 para top-puertos."
         f.write(_sec("[6] TOP PUERTOS + BANNERS", ptxt))
@@ -78,6 +118,13 @@ def build_ip_report(ip: str, geo: dict, ptr: str, rdap: dict, nombre: str | None
         f.write(_sec("[7] CABECERAS HTTP", htxt[:2000]))
         if notas_d:
             f.write(_sec("[8] NOTAS", str(notas_d)))
+        if verificacion:
+            vtxt = (f"Fuentes OK: {verificacion.get('fuentes_ok')} | Error: {verificacion.get('fuentes_error')}\n"
+                    f"Coincide pais: {verificacion.get('coincide_pais')} | Coincide ASN: {verificacion.get('coincide_asn')}\n"
+                    f"Avisos: {'; '.join(verificacion.get('avisos') or []) or 'ninguno'}")
+            for d in (verificacion.get("detalle") or []):
+                vtxt += f"\n  - {d.get('fuente')}: {d.get('pais')} / {d.get('org')} / {d.get('asn')}"
+            f.write(_sec("[9] VERIFICACION MULTI-FUENTE", vtxt))
         pais = geo.get("country", "?") if isinstance(geo, dict) else "?"
         ciudad = geo.get("city", "?") if isinstance(geo, dict) else "?"
         org = geo.get("org", "?") if isinstance(geo, dict) else "?"
@@ -85,7 +132,8 @@ def build_ip_report(ip: str, geo: dict, ptr: str, rdap: dict, nombre: str | None
         mapa = f"https://www.google.com/maps?q={lat},{lon}" if lat and lon else "Sin coordenadas"
         f.write("=" * 60 + "\nRESUMEN EJECUTIVO\n" + "=" * 60 + "\n")
         f.write(f"IP {ip} ({objetivo or ip}) -> {ciudad}, {pais} | Org: {org} | PTR: {ptr}\n")
-        f.write(f"Mapa: {mapa}\nArchivos: {os.path.basename(txt_path)} + .html gemelo\n")
+        f.write(f"Mapa: {mapa}\nArchivos: {os.path.basename(txt_path)} + .html gemelo + evidencia .json\n")
+        f.write(f"Integridad SHA-256: {sha}\n")
 
     # ---------- HTML super mejor 10/10 ----------
     html_path = os.path.join(BASE_DIR, f"reporte_IP_{tag}.html")
@@ -93,8 +141,11 @@ def build_ip_report(ip: str, geo: dict, ptr: str, rdap: dict, nombre: str | None
     rdap_h = _kv_table(rdap if isinstance(rdap, dict) else {"dato": rdap})
     dns_h = _kv_table(dns_d if isinstance(dns_d, dict) else {"resultado": str(dns_d)[:500]}) if dns_d else "<p>No recolectado (informe rápido).</p>"
     if puertos_d:
-        rows_p = "".join(f"<tr><th>puerto {html.escape(str(p))}</th><td>{html.escape(str(v))}</td></tr>" for p, v in sorted(puertos_d.items(), key=lambda kv: str(kv[0])))
-        puertos_h = "<table>" + rows_p + "</table>"
+        rows_p = "".join(
+            f"<tr><th>{html.escape(str(p))}</th><td>{html.escape(_serv(p, v))}</td><td>{html.escape(str(v))}</td></tr>"
+            for p, v in sorted(puertos_d.items(), key=lambda kv: int(kv[0]) if str(kv[0]).isdigit() else 0)
+        )
+        puertos_h = "<table><tr><th>PORT</th><th>SERVICE</th><th>DETALLE</th></tr>" + rows_p + "</table>"
     else:
         puertos_h = "<p>No recolectado (informe rápido). Usa opción 5 informe completo.</p>"
     if headers_d and isinstance(headers_d, dict) and "error" not in headers_d:
@@ -107,6 +158,22 @@ def build_ip_report(ip: str, geo: dict, ptr: str, rdap: dict, nombre: str | None
     else:
         mapa_h = "<p>Sin coordenadas.</p>"
     ping_h = f"<pre>{html.escape(str(ping_d)[:1500])}</pre>" if ping_d else "<p>No recolectado (informe rápido).</p>"
+    if verificacion:
+        filas_v = "".join(
+            f"<tr><th>{html.escape(str(d.get('fuente')))}</th><td>{html.escape(str(d.get('pais')))} / {html.escape(str(d.get('org')))} / {html.escape(str(d.get('asn')))}</td></tr>"
+            for d in (verificacion.get("detalle") or [])
+        )
+        avisos_v = "".join(f"<li>{html.escape(str(a))}</li>" for a in (verificacion.get("avisos") or [])) or "<li>Sin discrepancias.</li>"
+        verif_card = (f'<div class="card"><h2 class="v">9. Verificación multi-fuente</h2>'
+                      f"<p>Fuentes OK: <b>{verificacion.get('fuentes_ok')}</b> | Error: <b>{verificacion.get('fuentes_error')}</b> | "
+                      f"Acuerdo país: <b>{verificacion.get('coincide_pais')}</b> | Acuerdo ASN: <b>{verificacion.get('coincide_asn')}</b></p>"
+                      f"<table>{filas_v}</table><ul>{avisos_v}</ul></div>")
+    else:
+        verif_card = ""
+    evid_card = ('<div class="card"><h2>10. Evidencia e integridad</h2>'
+                 f"<p>Generado (UTC): <b>{html.escape(fecha_utc)}</b></p>"
+                 f"<p>Evidencia JSON: <b>{html.escape(os.path.basename(json_path))}</b></p>"
+                 f"<p>SHA-256: <code>{sha}</code></p></div>")
     pagina = f"""<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -145,6 +212,7 @@ Org: <b>{html.escape(str((geo or {{}}).get('org','?') if isinstance(geo,dict) el
 <div class="card"><h2 class="y">6. Top puertos + banners</h2>{puertos_h}</div>
 <div class="card"><h2>7. Cabeceras HTTP</h2>{headers_h}</div>
 <div class="card"><h2 class="v">8. Metodología</h2><p>Geo multi-fuente + PTR + RDAP HTTPS + ping + top-puertos con banner + headers. Solo pasivo/defensivo, sin exploits. Uso educativo autorizado.</p></div>
+{verif_card}{evid_card}
 </div>
 <footer>Darkly Tools (educativo) - Úsalo con responsabilidad y autorización.<br>
 <a href="index.html">Ver todos los reportes</a></footer>
@@ -153,17 +221,19 @@ Org: <b>{html.escape(str((geo or {{}}).get('org','?') if isinstance(geo,dict) el
         f.write(pagina)
 
     _update_index()
-    csv_path = _export_csv(tag, fecha, ip, objetivo, nombre or "", geo, ptr, rdap, puertos_d, headers_d)
-    pdf_path = _export_pdf(tag, fecha, ip, objetivo, nombre or "", geo, ptr, rdap, puertos_d)
-    return html_path, txt_path, csv_path, pdf_path
+    csv_path = _export_csv(tag, fecha, fecha_utc, sha, ip, objetivo, nombre or "", geo, ptr, rdap, puertos_d, headers_d)
+    pdf_path = _export_pdf(tag, fecha, fecha_utc, sha, ip, objetivo, nombre or "", geo, ptr, rdap, puertos_d)
+    return html_path, txt_path, csv_path, pdf_path, json_path
 
 
-def _export_csv(tag: str, fecha: str, ip: str, objetivo: str, nombre: str, geo: dict, ptr: str, rdap: dict, puertos: dict, headers: dict) -> str:
+def _export_csv(tag: str, fecha: str, fecha_utc: str, sha: str, ip: str, objetivo: str, nombre: str, geo: dict, ptr: str, rdap: dict, puertos: dict, headers: dict) -> str:
     path = os.path.join(BASE_DIR, f"reporte_IP_{tag}.csv")
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["campo", "valor"])
         w.writerow(["fecha", fecha])
+        w.writerow(["fecha_utc", fecha_utc])
+        w.writerow(["sha256_evidencia", sha])
         w.writerow(["ip", ip])
         w.writerow(["objetivo", objetivo])
         w.writerow(["nombre", nombre])
@@ -176,19 +246,20 @@ def _export_csv(tag: str, fecha: str, ip: str, objetivo: str, nombre: str, geo: 
                 w.writerow([f"rdap.{k}", v])
         if isinstance(puertos, dict):
             for p, v in puertos.items():
-                w.writerow([f"puerto.{p}", v])
+                w.writerow([f"puerto.{p}", f"{_serv(p, v)} | {v}"])
         if isinstance(headers, dict) and "error" not in headers:
             for k, v in list(headers.items())[:20]:
                 w.writerow([f"header.{k}", str(v)[:200]])
     return path
 
 
-def _export_pdf(tag: str, fecha: str, ip: str, objetivo: str, nombre: str, geo: dict, ptr: str, rdap: dict, puertos: dict) -> str:
+def _export_pdf(tag: str, fecha: str, fecha_utc: str, sha: str, ip: str, objetivo: str, nombre: str, geo: dict, ptr: str, rdap: dict, puertos: dict) -> str:
     """PDF mínimo válido sin dependencias (texto plano, Helvetica)."""
     path = os.path.join(BASE_DIR, f"reporte_IP_{tag}.pdf")
     lines = [
         "DARKLY TOOLS - INFORME IP",
         f"Fecha: {fecha} | IP: {ip}",
+        f"Generado UTC: {fecha_utc}",
         f"Objetivo: {objetivo or ip} | Nombre: {nombre or '-'}",
         "",
         "[1] GEO/PROVEEDOR",
@@ -206,7 +277,8 @@ def _export_pdf(tag: str, fecha: str, ip: str, objetivo: str, nombre: str, geo: 
             lines.append(f"puerto {p}: {v}")
     else:
         lines.append("No recolectado (informe rapido)")
-    lines += ["", "Solo fines educativos. Uso responsable y autorizado."]
+    lines += ["", "Solo fines educativos. Uso responsable y autorizado.",
+              f"Evidencia: reporte_IP_{tag}.json", f"SHA-256: {sha}"]
     # Limpia a latin-1 seguro
     clean = []
     for ln in lines[:80]:

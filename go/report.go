@@ -2,7 +2,9 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/csv"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"html"
@@ -10,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -73,6 +76,7 @@ func cmdReport(args []string) {
 	os.MkdirAll(dir, 0755)
 	ts := time.Now().Format("20060102_150405")
 	fecha := time.Now().Format("2006-01-02 15:04:05")
+	fechaUTC := time.Now().UTC().Format("2006-01-02 15:04:05 UTC")
 	tag := etag + "_" + ts
 
 	geo := geoCore(ip)
@@ -112,6 +116,29 @@ func cmdReport(args []string) {
 		}
 	}
 
+	// ---------- Evidencia JSON + integridad (SHA-256 del propio archivo) ----------
+	geoVerif, _ := geo["verificacion"].(map[string]any)
+	evidencia := map[string]any{
+		"herramienta":    "Darkly-Go",
+		"generado_local": fecha,
+		"generado_utc":   fechaUTC,
+		"ip":             ip,
+		"objetivo":       obj,
+		"nombre":         etag,
+		"geo":            geo,
+		"ptr":            ptr,
+		"rdap":           rdap,
+		"dns":            dns,
+		"ping":           ping,
+		"puertos":        ports,
+		"cabeceras":      headers,
+	}
+	evBytes, _ := json.MarshalIndent(evidencia, "", "  ")
+	sum := sha256.Sum256(evBytes)
+	sha := fmt.Sprintf("%x", sum)
+	jsonPath := filepath.Join(dir, "reporte_IP_"+tag+".json")
+	os.WriteFile(jsonPath, evBytes, 0644)
+
 	// ---------- TXT ----------
 	txtPath := filepath.Join(dir, "reporte_IP_"+tag+".txt")
 	var tb strings.Builder
@@ -120,8 +147,9 @@ func cmdReport(args []string) {
 		tb.WriteString(strings.Repeat("-", 60) + "\n" + t + "\n" + strings.Repeat("-", 60) + "\n" + cuerpo + "\n")
 	}
 	tb.WriteString(bar + " DARKLY-GO - INFORME DETALLADO POR IP (10/10)\n Solo fines educativos.\n" + bar)
-	tb.WriteString(fmt.Sprintf("Fecha: %s\nIP analizada: %s\nObjetivo original: %s\nNombre reporte: %s\n\n", fecha, ip, obj, etag))
-	sec("[1] GEOLOCALIZACION / PROVEEDOR", kvText(geo))
+	tb.WriteString(fmt.Sprintf("Fecha: %s\nGenerado UTC: %s\nIP analizada: %s\nObjetivo original: %s\nNombre reporte: %s\n", fecha, fechaUTC, ip, obj, etag))
+	tb.WriteString(fmt.Sprintf("Evidencia JSON: reporte_IP_%s.json\nSHA-256 (evidencia): %s\n\n", tag, sha))
+	sec("[1] GEOLOCALIZACION / PROVEEDOR", kvTextOmit(geo, "verificacion"))
 	sec("[2] DNS INVERSO (PTR)", ptr)
 	sec("[3] RDAP - REGISTRO PRECISO", kvText(rdap))
 	sec("[4] DNS DIRECTO / RESOLUCION", kvText(dns))
@@ -132,14 +160,37 @@ func cmdReport(args []string) {
 	for k := range ports {
 		pkeys = append(pkeys, k)
 	}
-	sort.Strings(pkeys)
+	sort.Slice(pkeys, func(i, j int) bool {
+		ai, _ := strconv.Atoi(pkeys[i])
+		aj, _ := strconv.Atoi(pkeys[j])
+		return ai < aj
+	})
 	for _, k := range pkeys {
-		fmt.Fprintf(&pb, "puerto %-5s: %s\n", k, ports[k])
+		fmt.Fprintf(&pb, "puerto %-5s %-15s: %s\n", k, serviceOf(k, ports[k]), ports[k])
 	}
 	sec("[6] TOP PUERTOS + BANNERS", pb.String())
 	sec("[7] CABECERAS HTTP", kvText(headers))
+	if geoVerif != nil {
+		vb := fmt.Sprintf("fuentes_ok: %v | fuentes_error: %v\ncoincide_pais: %v | coincide_asn: %v\n",
+			geoVerif["fuentes_ok"], geoVerif["fuentes_error"], geoVerif["coincide_pais"], geoVerif["coincide_asn"])
+		if avisos, ok := geoVerif["avisos"].([]string); ok {
+			if len(avisos) == 0 {
+				vb += "Avisos: ninguno\n"
+			} else {
+				vb += "Avisos: " + strings.Join(avisos, " | ") + "\n"
+			}
+		}
+		if det, ok := geoVerif["detalle"].([]map[string]any); ok {
+			for _, dm := range det {
+				vb += fmt.Sprintf("  - %v: %v / %v / %v\n", dm["fuente"], dm["pais"], dm["org"], dm["asn"])
+			}
+		}
+		sec("[8] VERIFICACION MULTI-FUENTE", vb)
+	}
+	sec("[9] EVIDENCIA E INTEGRIDAD", fmt.Sprintf("Archivo JSON: reporte_IP_%s.json\nSHA-256: %s\nGenerado UTC: %s", tag, sha, fechaUTC))
 	tb.WriteString(bar + "RESUMEN EJECUTIVO\n" + bar)
 	tb.WriteString(fmt.Sprintf("IP %s (%s) -> %s, %s | Org: %s | PTR: %s\nMapa: %s\n", ip, obj, ciudad, pais, org, ptr, mapa))
+	tb.WriteString(fmt.Sprintf("Archivos: reporte_IP_%s.txt + .html + .csv + .pdf + .json\nIntegridad SHA-256: %s\n", tag, sha))
 	os.WriteFile(txtPath, []byte(tb.String()), 0644)
 
 	// ---------- CSV ----------
@@ -148,6 +199,8 @@ func cmdReport(args []string) {
 		cw := csv.NewWriter(cf)
 		cw.Write([]string{"campo", "valor"})
 		cw.Write([]string{"fecha", fecha})
+		cw.Write([]string{"fecha_utc", fechaUTC})
+		cw.Write([]string{"sha256_evidencia", sha})
 		cw.Write([]string{"ip", ip})
 		cw.Write([]string{"objetivo", obj})
 		cw.Write([]string{"nombre", etag})
@@ -159,7 +212,7 @@ func cmdReport(args []string) {
 			cw.Write([]string{"rdap." + k, fmt.Sprintf("%v", v)})
 		}
 		for _, k := range pkeys {
-			cw.Write([]string{"puerto." + k, ports[k]})
+			cw.Write([]string{"puerto." + k, serviceOf(k, ports[k]) + " | " + ports[k]})
 		}
 		cw.Flush()
 		cf.Close()
@@ -167,6 +220,33 @@ func cmdReport(args []string) {
 
 	// ---------- HTML ----------
 	htmlPath := filepath.Join(dir, "reporte_IP_"+tag+".html")
+	verifCard := ""
+	if geoVerif != nil {
+		var vb strings.Builder
+		vb.WriteString(fmt.Sprintf("<p>Fuentes OK: <b>%v</b> | Error: <b>%v</b> | Acuerdo pais: <b>%v</b> | Acuerdo ASN: <b>%v</b></p><table>",
+			geoVerif["fuentes_ok"], geoVerif["fuentes_error"], geoVerif["coincide_pais"], geoVerif["coincide_asn"]))
+		if det, ok := geoVerif["detalle"].([]map[string]any); ok {
+			for _, dm := range det {
+				vb.WriteString("<tr><th>" + html.EscapeString(fmt.Sprintf("%v", dm["fuente"])) + "</th><td>" +
+					html.EscapeString(fmt.Sprintf("%v", dm["pais"])) + " / " +
+					html.EscapeString(fmt.Sprintf("%v", dm["org"])) + " / " +
+					html.EscapeString(fmt.Sprintf("%v", dm["asn"])) + "</td></tr>")
+			}
+		}
+		vb.WriteString("</table><ul>")
+		if avisos, ok := geoVerif["avisos"].([]string); ok && len(avisos) > 0 {
+			for _, a := range avisos {
+				vb.WriteString("<li>" + html.EscapeString(a) + "</li>")
+			}
+		} else {
+			vb.WriteString("<li>Sin discrepancias.</li>")
+		}
+		vb.WriteString("</ul>")
+		verifCard = `<div class="card"><h2>8. Verificacion multi-fuente</h2>` + vb.String() + `</div>`
+	}
+	evidCard := `<div class="card"><h2>9. Evidencia e integridad</h2><p>Generado (UTC): <b>` +
+		html.EscapeString(fechaUTC) + `</b></p><p>Evidencia JSON: <b>reporte_IP_` + html.EscapeString(tag) +
+		`.json</b></p><p>SHA-256: <code>` + html.EscapeString(sha) + `</code></p></div>`
 	var hb strings.Builder
 	hb.WriteString(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -180,19 +260,19 @@ header h1{margin:0;font-size:2.2em;letter-spacing:2px}header p{margin:8px 0 0;fo
 th{color:#00ffea;width:35%}td{color:#fff}.badge{display:inline-block;background:linear-gradient(90deg,#00ffea,#ff00ff);color:#000;font-weight:bold;border-radius:20px;padding:6px 18px;margin:4px}
 footer{text-align:center;color:#888;padding:20px;font-size:.85em}a{color:#00ffea}pre{white-space:pre-wrap;color:#fff}</style></head><body>
 <header><h1>DARKLY-GO</h1><p>Informe detallado por IP - ` + html.EscapeString(ip) + `</p>
-<p style="font-size:.9em">` + html.EscapeString(fecha) + ` | Objetivo: ` + html.EscapeString(obj) + ` | Nombre: ` + html.EscapeString(etag) + `</p></header>
+<p style="font-size:.9em">` + html.EscapeString(fecha) + ` | UTC: ` + html.EscapeString(fechaUTC) + ` | Objetivo: ` + html.EscapeString(obj) + ` | Nombre: ` + html.EscapeString(etag) + `</p></header>
 <div class="wrap"><div class="card"><h2>Resumen</h2>
 <span class="badge">IP: ` + html.EscapeString(ip) + `</span>
 <span class="badge">PTR: ` + html.EscapeString(truncStr(ptr, 60)) + `</span>
 <p>Ciudad: <b>` + html.EscapeString(ciudad) + `</b> | País: <b>` + html.EscapeString(pais) + `</b> | Org: <b>` + html.EscapeString(org) + `</b></p>
 <p><a href="` + html.EscapeString(mapa) + `" target="_blank">Ver mapa</a></p></div>
-<div class="card"><h2>1. Geolocalización</h2>` + kvTable(geo) + `</div>
+<div class="card"><h2>1. Geolocalización</h2>` + kvTableOmit(geo, "verificacion") + `</div>
 <div class="card"><h2>2. PTR</h2><p>` + html.EscapeString(ptr) + `</p></div>
 <div class="card"><h2>3. RDAP</h2>` + kvTable(rdap) + `</div>
 <div class="card"><h2>4. DNS directo</h2>` + kvTable(dns) + `</div>
 <div class="card"><h2>5. Ping</h2><pre>` + html.EscapeString(truncStr(ping, 1500)) + `</pre></div>
 <div class="card"><h2>6. Puertos</h2>` + portsTable(ports) + `</div>
-<div class="card"><h2>7. Cabeceras HTTP</h2>` + kvTable(headers) + `</div>
+<div class="card"><h2>7. Cabeceras HTTP</h2>` + kvTable(headers) + `</div>` + verifCard + evidCard + `
 </div><footer>Darkly-Go (educativo) - Úsalo con responsabilidad y autorización.<br><a href="index.html">Ver todos los reportes</a></footer></body></html>`)
 	os.WriteFile(htmlPath, []byte(hb.String()), 0644)
 
@@ -200,13 +280,55 @@ footer{text-align:center;color:#888;padding:20px;font-size:.85em}a{color:#00ffea
 	pdfPath := filepath.Join(dir, "reporte_IP_"+tag+".pdf")
 	writeMiniPDF(pdfPath, []string{
 		"DARKLY-GO - INFORME IP", "Fecha: " + fecha + " | IP: " + ip,
+		"Generado UTC: " + fechaUTC,
 		"Objetivo: " + obj + " | Nombre: " + etag, "",
 		"Geo: " + ciudad + ", " + pais + " | Org: " + org,
 		"PTR: " + truncStr(ptr, 90), "Mapa: " + mapa,
+		"Evidencia: reporte_IP_" + tag + ".json", "SHA-256: " + sha,
 	})
 
 	updateIndexGo(dir)
-	emitJSON(map[string]string{"html": htmlPath, "txt": txtPath, "csv": csvPath, "pdf": pdfPath})
+	emitJSON(map[string]string{"html": htmlPath, "txt": txtPath, "csv": csvPath, "pdf": pdfPath, "json": jsonPath})
+}
+
+// serviceOf deduce el servicio (estilo nmap) de un puerto y su detalle.
+func serviceOf(portKey, detalle string) string {
+	p, _ := strconv.Atoi(portKey)
+	banner := ""
+	if detalle != "cerrado" {
+		banner = detalle
+	}
+	return serviceName(p, banner)
+}
+
+// kvTextOmit formatea un mapa como texto omitiendo claves concretas.
+func kvTextOmit(m map[string]any, omit ...string) string {
+	skip := make(map[string]bool, len(omit))
+	for _, k := range omit {
+		skip[k] = true
+	}
+	filtered := map[string]any{}
+	for k, v := range m {
+		if !skip[k] {
+			filtered[k] = v
+		}
+	}
+	return kvText(filtered)
+}
+
+// kvTableOmit formatea un mapa como tabla HTML omitiendo claves concretas.
+func kvTableOmit(m map[string]any, omit ...string) string {
+	skip := make(map[string]bool, len(omit))
+	for _, k := range omit {
+		skip[k] = true
+	}
+	filtered := map[string]any{}
+	for k, v := range m {
+		if !skip[k] {
+			filtered[k] = v
+		}
+	}
+	return kvTable(filtered)
 }
 
 func kvText(m map[string]any) string {
@@ -244,9 +366,9 @@ func portsTable(ports map[string]string) string {
 	}
 	sort.Strings(keys)
 	var sb strings.Builder
-	sb.WriteString("<table>")
+	sb.WriteString("<table><tr><th>PORT</th><th>SERVICE</th><th>DETALLE</th></tr>")
 	for _, k := range keys {
-		sb.WriteString("<tr><th>puerto " + html.EscapeString(k) + "</th><td>" + html.EscapeString(ports[k]) + "</td></tr>")
+		sb.WriteString("<tr><th>" + html.EscapeString(k) + "</th><td>" + html.EscapeString(serviceOf(k, ports[k])) + "</td><td>" + html.EscapeString(ports[k]) + "</td></tr>")
 	}
 	sb.WriteString("</table>")
 	return sb.String()

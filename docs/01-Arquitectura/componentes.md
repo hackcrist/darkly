@@ -21,10 +21,10 @@ Ubicación y responsabilidad de cada pieza del repositorio. Firmas verificadas d
 | :--- | :--- |
 | `networking.py` | `dns_lookup(host, timeout=8)`, `port_scan(host, ports, timeout=1.0, workers=50)`, `banner_grab(host, port, timeout=3.0)`, `ping_host(host, count=2, timeout=2)`, `traceroute(host, max_hops=20, timeout=2)`, `subnet_info(cidr)`, `parse_ports(port_str)` |
 | `security.py` | `hash_text(text, algo='sha256')`, `identify_hash(h)`, `password_strength(password)`, `generate_password(length=16)`, `check_security_headers(url, timeout=10)`, `scan_url(url)`, `check_password_breach(password, timeout=10)`, `audit_password(password, timeout=10)` |
-| `gathering.py` | `public_ip_info(timeout=10)`, `ip_lookup(ip, timeout=10)`, `http_headers(url, timeout=10)`, `reverse_dns(ip, timeout=8)`, `whois_lookup(query, timeout=10)`, `rdap_lookup(query, timeout=12)`, `dns_records(domain, timeout=8)`, `subdomains_crtsh(domain, timeout=15, limit=50)`, `github_profile(user, timeout=10)` |
+| `gathering.py` | `public_ip_info(timeout=10)`, `ip_lookup(ip, timeout=10)`, `ip_lookup_multi(ip, timeout=10)`, `http_headers(url, timeout=10)`, `reverse_dns(ip, timeout=8)`, `whois_lookup(query, timeout=10)`, `rdap_lookup(query, timeout=12)`, `dns_records(domain, timeout=8)`, `subdomains_crtsh(domain, timeout=15, limit=50)`, `github_profile(user, timeout=10)` |
 | `system_tools.py` | `sys_info()`, `disk_usage(path='.')`, `try_psutil_stats()`, `file_hash(path, algo='sha256')`, `file_hash_verify(path, esperado, algo='sha256')`, `get_uptime()`, `list_processes(limit=15)`, `check_permissions(path)`, `tail_log(path, lines=20)` |
 | `username.py` | `search(username, timeout=10, workers=6)`, `validate_username(u)`, `save_report(username, results)` |
-| `reporter.py` | `build_ip_report(ip, geo, ptr, rdap, nombre=None, objetivo='', extra=None)` retorna `(html, txt, csv, pdf)` |
+| `reporter.py` | `build_ip_report(ip, geo, ptr, rdap, nombre=None, objetivo='', extra=None)` retorna `(html, txt, csv, pdf, json)`. El JSON es la evidencia en bruto y su SHA-256 se imprime en el resto de formatos. |
 | `gospeed.py` | `go_run(*args, timeout=120)`, `go_port_scan(host, ports, ...)`, `go_dns_lookup(host)`, `ensure_binary()` |
 
 ### Módulos Go (`go/`)
@@ -32,11 +32,11 @@ Ubicación y responsabilidad de cada pieza del repositorio. Firmas verificadas d
 | Archivo | Comandos |
 | :--- | :--- |
 | `main.go` | `scan`, `dns`, `version` |
-| `netx.go` | `ping`, `subnet`, `traceroute` y núcleos `dnsCore`, `pingCore`, `scanCore` |
+| `netx.go` | `ping`, `subnet`, `traceroute` y núcleos `dnsCore`, `pingCore`, `scanCore`, `serviceName`, `nmapTable` |
 | `sec.go` | `hash`, `hashid`, `pass`, `genpass`, `audit`, `breach`, `headers`, `urlscan` |
-| `osint.go` | `ipinfo`, `ptr`, `rdap`, `whois`, `user`, `dnsrecords`, `subdomains`, `ghuser` |
+| `osint.go` | `ipinfo`, `ptr`, `rdap`, `whois`, `user`, `dnsrecords`, `subdomains`, `ghuser` y `geoCore` con verificación multi-fuente |
 | `sys.go` | `sysinfo`, `filehash`, `verify` |
-| `report.go` | `report` (HTML, TXT, CSV y PDF mínimo) |
+| `report.go` | `report` (HTML, TXT, CSV, PDF mínimo y JSON de evidencia con SHA-256) |
 
 ---
 
@@ -51,11 +51,11 @@ Ubicación y responsabilidad de cada pieza del repositorio. Firmas verificadas d
 ## Ejemplo de Uso
 
 ```python
-from tools.gathering import ip_lookup
+from tools.gathering import ip_lookup_multi
 from tools import reporter
 
-geo = ip_lookup("8.8.8.8")
-html, txt, csv, pdf = reporter.build_ip_report("8.8.8.8", geo, "dns.google", {"nombre": "GOGL"})
+geo = ip_lookup_multi("8.8.8.8")
+html, txt, csv, pdf, json_evidencia = reporter.build_ip_report("8.8.8.8", geo, "dns.google", {"nombre": "GOGL"})
 ```
 
 ```bash

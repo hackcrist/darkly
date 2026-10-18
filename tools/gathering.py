@@ -140,7 +140,7 @@ def github_profile(user: str, timeout: int = 10) -> dict:
 
 
 def _norm_geo(data: dict) -> dict:
-    """Normaliza ipwho.is (latitude/longitude/connection) al esquema común."""
+    """Normaliza ipwho.is (latitude/longitude/connection) y saca el ASN si viene."""
     if isinstance(data, dict) and "latitude" in data and "lat" not in data:
         conn = data.get("connection") or {}
         data["lat"] = data.get("latitude")
@@ -148,15 +148,46 @@ def _norm_geo(data: dict) -> dict:
         data["query"] = data.get("ip", data.get("query"))
         data["org"] = conn.get("org") or conn.get("isp") or data.get("org")
         data["isp"] = conn.get("isp") or data.get("isp")
+        if conn.get("asn") and "asn" not in data:
+            data["asn"] = f"AS{conn['asn']}"
+    if isinstance(data, dict) and "asn" not in data:
+        # ip-api entrega 'as' = "AS15169 Google LLC"
+        as_field = data.get("as")
+        if isinstance(as_field, str) and as_field.strip():
+            data["asn"] = as_field.split(" ", 1)[0]
+    if isinstance(data, dict):
+        # Codigo ISO para comparar entre fuentes sin falsos negativos (US vs United States).
+        codigo = data.get("countryCode") or data.get("country_code")
+        if codigo:
+            data["pais_codigo"] = str(codigo).upper()
     return data
 
 
+def _fuente_corta(url: str) -> str:
+    """Nombre legible de la fuente: ip-api.com, ipapi.co, ipwho.is."""
+    try:
+        host = url.split("://", 1)[1].split("/", 1)[0]
+        return host
+    except Exception:
+        return url
+
+
+def _geo_fuentes(ip: str) -> list[str]:
+    """Fuentes publicas de geolocalizacion, en orden de fiabilidad."""
+    q = urllib.parse.quote(ip)
+    return [
+        f"http://ip-api.com/json/{q}?fields=status,message,country,countryCode,regionName,city,lat,lon,org,isp,as,query",
+        f"https://ipapi.co/{q}/json/",
+        f"https://ipwho.is/{q}",
+    ]
+
+
 def public_ip_info(timeout: int = 10) -> dict:
-    """Multi-fuente con respaldo: ip-api -> ipapi.co -> ipwho.is."""
+    """Mi IP publica: multi-fuente con respaldo (incluye ASN/ISP)."""
     import json as _json
     import urllib.request as _req
     fuentes = [
-        "http://ip-api.com/json/?fields=status,message,country,regionName,city,query,org,isp",
+        "http://ip-api.com/json/?fields=status,message,country,countryCode,regionName,city,query,org,isp,as",
         "https://ipapi.co/json/",
         "https://ipwho.is/json/",
     ]
@@ -166,14 +197,15 @@ def public_ip_info(timeout: int = 10) -> dict:
             rq = _req.Request(url, headers={"User-Agent": "Darkly-Tools/1.0 (educativo)"})
             with _req.urlopen(rq, timeout=timeout, context=_ssl_ctx()) as r:
                 data = _norm_geo(_json.loads(r.read().decode()))
-            data["fuente"] = url
+            data["fuente"] = _fuente_corta(url)
             return data
         except Exception as e:
-            ultimo_error = f"{url}: {e}"
+            ultimo_error = f"{_fuente_corta(url)}: {e}"
     return {"error": f"Todas las fuentes fallaron. {ultimo_error}. Revisa tu internet/DNS."}
 
 
 def ip_lookup(ip: str, timeout: int = 10) -> dict:
+    """Geolocalizacion rapida: primera fuente que responda (incluye ASN/ISP)."""
     ip = ip.strip()
     import ipaddress as _ip
     try:
@@ -182,22 +214,72 @@ def ip_lookup(ip: str, timeout: int = 10) -> dict:
         return {"error": f"'{ip}' no es una IP válida (ej. 8.8.8.8)"}
     import json as _json
     import urllib.request as _req
-    fuentes = [
-        f"http://ip-api.com/json/{urllib.parse.quote(ip)}?fields=status,message,country,regionName,city,lat,lon,org,isp,query",
-        f"https://ipapi.co/{urllib.parse.quote(ip)}/json/",
-        f"https://ipwho.is/{urllib.parse.quote(ip)}",
-    ]
     ultimo_error = ""
-    for url in fuentes:
+    for url in _geo_fuentes(ip):
         try:
             rq = _req.Request(url, headers={"User-Agent": "Darkly-Tools/1.0 (educativo)"})
             with _req.urlopen(rq, timeout=timeout, context=_ssl_ctx()) as r:
                 data = _norm_geo(_json.loads(r.read().decode()))
-            data["fuente"] = url
+            data["fuente"] = _fuente_corta(url)
             return data
         except Exception as e:
-            ultimo_error = f"{url}: {e}"
+            ultimo_error = f"{_fuente_corta(url)}: {e}"
     return {"error": f"Todas las fuentes fallaron. {ultimo_error}"}
+
+
+def ip_lookup_multi(ip: str, timeout: int = 10) -> dict:
+    """Consulta varias fuentes y verifica si coinciden (pais/ASN). Datos mas reales."""
+    ip = ip.strip()
+    import ipaddress as _ip
+    try:
+        _ip.ip_address(ip)
+    except ValueError:
+        return {"error": f"'{ip}' no es una IP válida (ej. 8.8.8.8)"}
+    import json as _json
+    import urllib.request as _req
+    principal: dict | None = None
+    detalle: list[dict] = []
+    errores: list[str] = []
+    for url in _geo_fuentes(ip):
+        try:
+            rq = _req.Request(url, headers={"User-Agent": "Darkly-Tools/1.0 (educativo)"})
+            with _req.urlopen(rq, timeout=timeout, context=_ssl_ctx()) as r:
+                data = _norm_geo(_json.loads(r.read().decode()))
+        except Exception as e:
+            errores.append(f"{_fuente_corta(url)}: {e}")
+            continue
+        if principal is None:
+            principal = data
+            principal["fuente"] = _fuente_corta(url)
+        detalle.append({
+            "fuente": _fuente_corta(url),
+            "pais": data.get("country"),
+            "pais_codigo": data.get("pais_codigo"),
+            "ciudad": data.get("city"),
+            "org": data.get("org") or data.get("isp"),
+            "asn": data.get("asn"),
+        })
+    if principal is None:
+        return {"error": f"Todas las fuentes fallaron. {'; '.join(errores)}"}
+    # Comparar por codigo ISO cuando exista (evita "US" vs "United States").
+    paises = sorted({d["pais_codigo"] for d in detalle if d.get("pais_codigo")})
+    if not paises:
+        paises = sorted({d["pais"] for d in detalle if d.get("pais")})
+    asns = sorted({d["asn"] for d in detalle if d["asn"]})
+    avisos: list[str] = []
+    if len(paises) > 1:
+        avisos.append(f"Pais distinto entre fuentes: {', '.join(paises)}")
+    if len(asns) > 1:
+        avisos.append(f"ASN distinto entre fuentes: {', '.join(asns)}")
+    principal["verificacion"] = {
+        "fuentes_ok": len(detalle),
+        "fuentes_error": len(errores),
+        "coincide_pais": len(paises) <= 1,
+        "coincide_asn": len(asns) <= 1,
+        "avisos": avisos,
+        "detalle": detalle,
+    }
+    return principal
 
 
 def http_headers(url: str, timeout: int = 10) -> dict:

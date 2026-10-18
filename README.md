@@ -121,9 +121,9 @@ Submenús:
 |---|---|
 | Redes | DNS con respaldo DoH, ping, escaneo de puertos con banner real, traceroute, subredes, DNS y escaneo rápidos en Go |
 | Seguridad | Hash e identificación, fortaleza y generador auto-verificado, auditoría HIBP con k-anonymity y caché, cabeceras, detector de phishing |
-| OSINT pasivo | GeoIP triple fuente, PTR preciso, RDAP, WHOIS, registros DNS, subdominios crt.sh, perfil GitHub, usuarios en 17 sitios |
+| OSINT pasivo | GeoIP triple fuente con ASN y proveedor, más verificación de acuerdos entre fuentes, PTR preciso, RDAP, WHOIS, registros DNS, subdominios crt.sh, perfil GitHub, usuarios en 17 sitios |
 | Sistema | Sysinfo, disco, CPU/RAM, uptime, procesos, hash y verificación de archivos, permisos, logs |
-| IP / Info | Acepta IP o dominio, informe 10/10 con mapa y auto-guardado en 4 formatos |
+| IP / Info | Acepta IP o dominio, informe 10/10 con mapa, evidencia JSON con hash y auto-guardado en 5 formatos |
 
 ## Comandos Go
 
@@ -181,7 +181,7 @@ Sistema, reportes y utilidades:
 ./darkly-go.exe dns --host google.com                     # DNS sistema + DoH
 ./darkly-go.exe audit 'mi-clave'                          # fortaleza + filtración
 ./darkly-go.exe ipinfo 8.8.8.8                            # geo triple fuente
-./darkly-go.exe report --ip 8.8.8.8 --nombre casa         # HTML + TXT + CSV + PDF
+./darkly-go.exe report --ip 8.8.8.8 --nombre casa         # HTML + TXT + CSV + PDF + JSON
 ```
 
 ## API web
@@ -229,11 +229,14 @@ Despliegue sugerido: Render o Railway con `gunicorn webapp:app`, `DARKLY_TOKEN` 
 
 ## Reportes
 
-Cada consulta de IP genera HTML + TXT + CSV + PDF en `reportes/` (carpeta auto-creada, no se sube a git) con índice `index.html`:
+Cada consulta de IP genera cinco archivos en `reportes/` (carpeta auto-creada, no se sube a git) con índice `index.html`:
 
-- TXT de 8 secciones: geo, PTR, RDAP, DNS, ping, puertos, headers y resumen ejecutivo.
+- TXT de 10 secciones: geo, PTR, RDAP, DNS, ping, puertos (con servicio), headers, verificación multi-fuente, evidencia y resumen ejecutivo.
 - HTML con mapa embebido cuando hay coordenadas.
 - CSV en formato campo/valor y PDF simple sin dependencias.
+- JSON de evidencia con todos los datos en bruto y su SHA-256.
+
+La evidencia JSON se guarda tal cual y su SHA-256 queda impreso en el TXT, el HTML y el PDF. Así se puede comprobar que el informe no se alteró, por ejemplo con `certutil -hashfile reporte_IP_casa_20261018_153000.json SHA256` en Windows o `sha256sum` en Linux. Los puertos se listan con servicio aproximado al estilo nmap en columnas PORT / STATE / SERVICE / DETALLE.
 
 Los nombres llevan marca de tiempo, por ejemplo `reporte_IP_casa_20261018_153000.html`, y `index.html` se regenera con cada informe nuevo.
 
@@ -249,11 +252,13 @@ Flujo de datos:
 
 Detalle por módulo:
 
-- **Redes:** resuelve DNS primero con el sistema y si falla usa DoH (`one.one.one.one`, que resiste redes con filtro TLS). El port scan abre conexiones TCP en paralelo (50 hilos Python / 100 goroutines Go) y para cada puerto abierto lee el banner real del servicio en vez de solo decir "abierto".
+- **Redes:** resuelve DNS primero con el sistema y si falla usa DoH (`one.one.one.one`, que resiste redes con filtro TLS). El port scan abre conexiones TCP en paralelo (50 hilos Python / 100 goroutines Go), lee el banner real del servicio y muestra una tabla estilo nmap (PORT / STATE / SERVICE / DETALLE).
 - **Seguridad:** los hashes se calculan localmente. La auditoría HIBP usa k-anonymity: solo viajan los 5 primeros caracteres del SHA-1, la clave nunca sale del equipo, y las respuestas se cachean en memoria. El detector de URLs puntúa heurísticas (truco `@`, IP cruda, punycode, TLD raro, puerto inusual).
-- **OSINT:** GeoIP prueba 3 fuentes en orden (ip-api, ipapi.co, ipwho.is) y normaliza los campos para que reportes y mapas funcionen igual. El PTR valida el tipo de IP (privada, loopback, reservada) antes de consultar y usa DoH como respaldo. RDAP va por HTTPS (puerto 443) porque el WHOIS clásico (puerto 43) suele estar bloqueado. Los subdominios salen de crt.sh con reintentos y respaldo HackerTarget. La búsqueda de usuarios abre perfiles públicos y marca como "indicio" los sitios con login o JS que dan falsos positivos.
+- **OSINT:** GeoIP consulta 3 fuentes (ip-api, ipapi.co, ipwho.is), normaliza los campos, extrae ASN y proveedor y compara las respuestas entre sí para avisar si el país o el ASN no coinciden. El PTR valida el tipo de IP (privada, loopback, reservada) antes de consultar y usa DoH como respaldo. RDAP va por HTTPS (puerto 443) porque el WHOIS clásico (puerto 43) suele estar bloqueado. Los subdominios salen de crt.sh con reintentos y respaldo HackerTarget. La búsqueda de usuarios abre perfiles públicos y marca como "indicio" los sitios con login o JS que dan falsos positivos.
 - **Sistema:** todo local con `psutil` (CPU, RAM, uptime, procesos) y lectura de archivos por bloques para hashes de hasta 500 MB, con verificación contra hash esperado.
-- **Reportes:** `tools/reporter.py` genera los 4 formatos más índice.
+- **Reportes:** `tools/reporter.py` genera los 5 formatos (HTML, TXT, CSV, PDF y JSON de evidencia) más el índice.
+
+Las operaciones de red muestran su tiempo real al terminar (por ejemplo `[geo multi-fuente: 1.56s]`) para distinguir "sin datos" de "tardó mucho".
 
 ## Estructura
 
@@ -275,16 +280,17 @@ assets/              # logo y capturas del README
 | Menú Python y módulos | Sí | Sí | Sí |
 | `darkly-go` | Sí | Sí | Sí |
 | Ping y traceroute | Sí | Sí | Reducido sin root |
-| Reportes (HTML/TXT/CSV/PDF) | Sí | Sí | Sí |
+| Reportes (HTML/TXT/CSV/PDF/JSON) | Sí | Sí | Sí |
 | API web (Flask) | Sí | Sí | Sí |
 
 macOS no está cubierto por el instalador, aunque los módulos de Python y Go funcionan si las herramientas del sistema están presentes.
 
 ## Precisión anti-fallos
 
-- DoH por `one.one.one.one` (resiste redes con filtro TLS), geo triple con normalización.
+- DoH por `one.one.one.one` (resiste redes con filtro TLS), geo triple con normalización y verificación de acuerdos (país y ASN) entre fuentes.
 - RDAP por HTTPS en vez de WHOIS, crt.sh con reintentos y respaldo HackerTarget.
-- Ping y tracert decodificados de OEM a UTF-8, puertos con banner real, URLs con heurística honesta.
+- Ping y tracert decodificados de OEM a UTF-8, puertos con banner real y servicio estilo nmap, URLs con heurística honesta.
+- Evidencia JSON por informe con SHA-256 verificable y hora UTC.
 - SSL con `certifi` en todas las funciones HTTPS.
 
 ## Seguridad y uso responsable

@@ -6,6 +6,8 @@ Solo fines educativos. Uso responsable y autorizado.
 """
 import os
 import sys
+import time
+import contextlib
 
 __version__ = "2.0.0"
 
@@ -166,9 +168,12 @@ def print_kv(data, indent: str = "   "):
     if isinstance(data, dict):
         w = max((len(str(k)) for k in data), default=0)
         for k, v in data.items():
-            missing = isinstance(v, str) and v == "MISSING"
-            if missing:
+            if k == "error" or (isinstance(v, str) and v.startswith("[!]")):
                 col = C.rgb(255, 49, 49)
+            elif isinstance(v, str) and v == "MISSING":
+                col = C.rgb(255, 49, 49)
+            elif v is None or (isinstance(v, str) and v in ("", "?", "-")):
+                col = C.D
             elif isinstance(v, (int, float)):
                 col = C.NY
             else:
@@ -183,6 +188,31 @@ def print_kv(data, indent: str = "   "):
                 print(f"{indent}{C.NG}-{C.END} {C.W}{item}{C.END}")
     else:
         print(f"{indent}{data}")
+
+
+@contextlib.contextmanager
+def timed(label: str):
+    """Mide y muestra el tiempo real de una operacion."""
+    t0 = time.perf_counter()
+    yield
+    print(f" {C.DIM}[{label}: {time.perf_counter() - t0:.2f}s]{C.END}")
+
+
+def show_ports(titulo: str, items: dict):
+    """Tabla de puertos estilo nmap: PORT / STATE / SERVICE / DETALLE.
+    items: {puerto: (abierto: bool, detalle: str)}"""
+    print(f"\n {C.BOLD}{'PORT':<8} {'STATE':<8} {'SERVICE':<16} DETALLE{C.END}")
+    print(LINE)
+    n_open = 0
+    for p in sorted(items, key=lambda x: int(x) if str(x).isdigit() else 0):
+        abierto, detalle = items[p]
+        n_open += int(bool(abierto))
+        estado = f"{C.NG}open{C.END}" if abierto else f"{C.D}closed{C.END}"
+        serv = networking.service_for(int(p), "" if not abierto else str(detalle))
+        col = C.W if abierto else C.D
+        print(f" {str(p):<8} {estado:<16} {serv:<16} {col}{detalle or '-'}{C.END}")
+    print(LINE)
+    print(f" {C.DIM}{titulo}: {n_open} abiertos / {len(items)} probados{C.END}")
 
 
 def pause():
@@ -210,30 +240,35 @@ def networking_menu():
             return
         try:
             if c == "1":
-                print_kv(networking.dns_lookup(networking.validate_target(ask("Host"))))
+                host_d = networking.validate_target(ask("Host"))
+                with timed("DNS"):
+                    res_d = networking.dns_lookup(host_d)
+                print_kv(res_d)
             elif c == "2":
-                print(f"\n{networking.ping_host(networking.validate_target(ask('Host')))}")
+                host_p = networking.validate_target(ask("Host"))
+                with timed("ping"):
+                    salida_p = networking.ping_host(host_p)
+                print(f"\n{salida_p}")
             elif c == "3":
                 if not confirm_auth():
                     err("Escaneo cancelado - se requiere autorización."); pause(); continue
                 host = networking.validate_target(ask("Host/IP"))
                 ports = networking.parse_ports(ask("Puertos (ej. 22,80,443 o 1-1024)"))
                 warn(f"Escaneando {host} ({len(ports)} puertos)...")
-                res = networking.port_scan(host, ports)
+                with timed("escaneo"):
+                    res = networking.port_scan(host, ports)
                 if "error" in res:
                     err(str(res["error"])); pause(); continue
-                print(LINE)
+                items = {}
                 for p in sorted(res):
-                    if res[p]:
-                        banner = networking.banner_grab(host, p)
-                        estado = f"{C.NG}ABIERTO{C.END} -> {banner}"
-                    else:
-                        estado = f"{C.D}cerrado{C.END}"
-                    print(f"   puerto {C.BOLD}{p:<5}{C.END} : {estado}")
-                print(LINE)
+                    items[p] = (True, networking.banner_grab(host, p)) if res[p] else (False, "cerrado")
+                show_ports(f"Escaneo de {host}", items)
             elif c == "4":
                 warn("Trazando ruta (puede tardar)...")
-                print(f"\n{networking.traceroute(networking.validate_target(ask('Host/IP')))}")
+                host_t = networking.validate_target(ask("Host/IP"))
+                with timed("traceroute"):
+                    salida_t = networking.traceroute(host_t)
+                print(f"\n{salida_t}")
             elif c == "5":
                 print_kv(networking.subnet_info(ask("CIDR (ej. 192.168.1.0/24)")))
             elif c == "6":
@@ -243,7 +278,9 @@ def networking_menu():
             elif c == "7":
                 host = networking.validate_target(ask("Host"))
                 try:
-                    print_kv(gospeed.go_dns_lookup(host))
+                    with timed("DNS Go"):
+                        res_go = gospeed.go_dns_lookup(host)
+                    print_kv(res_go)
                 except RuntimeError as e:
                     warn(f"{e} Usando Python...")
                     print_kv(networking.dns_lookup(host))
@@ -254,24 +291,23 @@ def networking_menu():
                 prange = ask("Puertos (ej. 22,80,443 o 1-1024)")
                 try:
                     warn("Escaneando con Go (goroutines)...")
-                    data = gospeed.go_port_scan(host, prange)
+                    with timed("escaneo Go"):
+                        data = gospeed.go_port_scan(host, prange)
                     print(f"   IP: {data.get('ip', '?')}")
-                    print(LINE)
-                    for p, info in sorted(data.get("ports", {}).items(), key=lambda kv: int(kv[0])):
-                        if info.get("open"):
-                            print(f"   puerto {C.BOLD}{p:<5}{C.END} : {C.NG}ABIERTO{C.END} -> {info.get('banner', '')}")
-                        else:
-                            print(f"   puerto {C.BOLD}{p:<5}{C.END} : {C.D}cerrado{C.END}")
-                    print(LINE)
+                    items = {}
+                    for p, info in data.get("ports", {}).items():
+                        items[p] = (bool(info.get("open")), info.get("banner", "") or "cerrado")
+                    show_ports(f"Escaneo Go de {host}", items)
                 except RuntimeError as e:
                     warn(f"{e} Usando Python...")
                     ports = networking.parse_ports(prange)
-                    res = networking.port_scan(host, ports)
+                    with timed("escaneo"):
+                        res = networking.port_scan(host, ports)
                     if "error" in res:
                         err(str(res["error"]))
                     else:
-                        for p in sorted(res):
-                            print(f"   puerto {p}: {'ABIERTO' if res[p] else 'cerrado'}")
+                        items = {p: ((True, networking.banner_grab(host, p)) if res[p] else (False, "cerrado")) for p in res}
+                        show_ports(f"Escaneo de {host}", items)
             else:
                 err("Opción no válida")
         except Exception as e:
@@ -346,7 +382,8 @@ def gathering_menu():
             if c == "0":
                 return
             if c == "1":
-                info = gathering.public_ip_info()
+                with timed("mi IP"):
+                    info = gathering.public_ip_info()
                 print_kv(info)
                 ip = info.get("query", "") if isinstance(info, dict) else ""
                 if ip and "error" not in info:
@@ -378,11 +415,15 @@ def gathering_menu():
             elif c == "5":
                 print(f"\n{gathering.whois_lookup(ask('Dominio/IP'))}")
             elif c == "6":
-                print_kv(gathering.rdap_lookup(ask("Dominio/IP (ej. google.com u 8.8.8.8)")))
+                q6 = ask("Dominio/IP (ej. google.com u 8.8.8.8)")
+                with timed("RDAP"):
+                    r6 = gathering.rdap_lookup(q6)
+                print_kv(r6)
             elif c == "7":
                 u = username.validate_username(ask("Nombre de usuario (sin @)"))
                 warn(f"Buscando '{u}' en {len(username.SITES)} sitios públicos (puede tardar ~30s)...")
-                res = username.search(u)
+                with timed("busqueda"):
+                    res = username.search(u)
                 hits = [r for r in res if r["estado"].startswith("posible perfil")]
                 print(f"\n {C.NG}{C.BOLD}Posibles perfiles: {len(hits)}/{len(res)}{C.END}")
                 for r in res:
@@ -397,12 +438,17 @@ def gathering_menu():
             elif c == "8":
                 print_kv(gathering.dns_records(ask("Dominio (ej. google.com)")))
             elif c == "9":
-                r = gathering.subdomains_crtsh(ask("Dominio (ej. google.com)"))
+                d9 = ask("Dominio (ej. google.com)")
+                with timed("crt.sh"):
+                    r = gathering.subdomains_crtsh(d9)
                 print_kv({k: v for k, v in r.items() if k != "subdominios"})
                 for s in r.get("subdominios", [])[:50]:
                     print(f"   - {s}")
             elif c == "10":
-                print_kv(gathering.github_profile(ask("Usuario GitHub (sin @)")))
+                u10 = ask("Usuario GitHub (sin @)")
+                with timed("GitHub"):
+                    r10 = gathering.github_profile(u10)
+                print_kv(r10)
             else:
                 err("Opción no válida")
         except Exception as e:
@@ -484,9 +530,9 @@ def auto_save_ip(ip: str, nombre: str | None = None, objetivo: str = "") -> tupl
             rdap = {"error": str(e)}
         g = geo if isinstance(geo, dict) else {"dato": str(geo)}
         r = rdap if isinstance(rdap, dict) else {"dato": str(rdap)}
-        h, t, c, p = reporter.build_ip_report(ip, g, str(ptr), r, nombre=nombre, objetivo=objetivo or ip)
+        h, t, c, p, j = reporter.build_ip_report(ip, g, str(ptr), r, nombre=nombre, objetivo=objetivo or ip)
         print(f"\n {C.NG}{C.BOLD}Auto-guardado en reportes/:{C.END}")
-        print(f"   HTML: {h}\n   TXT : {t}\n   CSV : {c}\n   PDF : {p}")
+        print(f"   HTML: {h}\n   TXT : {t}\n   CSV : {c}\n   PDF : {p}\n   JSON: {j}")
         return h, t
     except Exception as e:
         err(f"No se pudo auto-guardar: {e}")
@@ -504,7 +550,8 @@ def ip_menu():
             if c == "0":
                 return
             if c == "1":
-                info = gathering.public_ip_info()
+                with timed("mi IP"):
+                    info = gathering.public_ip_info()
                 print_kv(info)
                 ip = info.get("query", "") if isinstance(info, dict) else ""
                 if ip and "error" not in info:
@@ -535,7 +582,8 @@ def ip_menu():
                 ip, objetivo = resolve_ip_input(entrada)
                 nombre = ask("Nombre especifico para el reporte [Enter=auto]") or (objetivo if objetivo != ip else None)
                 warn(f"Recolectando informe 10/10 de {ip} (geo+PTR+RDAP+ping+puertos+headers)...")
-                geo = gathering.ip_lookup(ip)
+                with timed("geo multi-fuente"):
+                    geo = gathering.ip_lookup_multi(ip)
                 ptr = gathering.reverse_dns(ip)
                 try:
                     rdap = gathering.rdap_lookup(ip)
@@ -562,14 +610,24 @@ def ip_menu():
                     headers_d = gathering.http_headers(ip)
                 except Exception as e:
                     headers_d = {"error": str(e)}
-                print(f"\n {C.NC}{C.BOLD}-- Geo/Org --{C.END}"); print_kv(geo)
+                print(f"\n {C.NC}{C.BOLD}-- Geo/Org --{C.END}")
+                print_kv({k: v for k, v in geo.items() if k != "verificacion"} if isinstance(geo, dict) else geo)
+                if isinstance(geo, dict) and geo.get("verificacion"):
+                    vf = geo["verificacion"]
+                    print(f"\n {C.NP}{C.BOLD}-- Verificacion multi-fuente --{C.END}")
+                    print_kv({"fuentes_ok": vf.get("fuentes_ok"), "fuentes_error": vf.get("fuentes_error"),
+                              "coincide_pais": vf.get("coincide_pais"), "coincide_asn": vf.get("coincide_asn")})
+                    for aviso in (vf.get("avisos") or []):
+                        warn(aviso)
+                    for d in (vf.get("detalle") or []):
+                        print(f"   {C.DIM}- {d.get('fuente')}: {d.get('pais')} / {d.get('org')} / {d.get('asn')}{C.END}")
                 print(f"\n {C.NG}{C.BOLD}-- PTR --{C.END}"); ok(ptr)
                 print(f"\n {C.NP}{C.BOLD}-- RDAP --{C.END}"); print_kv(rdap)
                 print(f"\n {C.NY}{C.BOLD}-- Puertos --{C.END}"); print_kv(puertos_d)
                 extra = {"dns": dns_d, "ping": ping_d, "puertos": puertos_d, "headers": headers_d,
                          "notas": f"Objetivo {objetivo}, informe completo 10/10"}
-                h, t, c, p = reporter.build_ip_report(ip, geo if isinstance(geo, dict) else {"dato": geo}, str(ptr), rdap if isinstance(rdap, dict) else {"dato": rdap}, nombre=nombre, objetivo=objetivo, extra=extra)
-                print(f"\n {C.NY}{C.BOLD}Guardado en carpeta reportes/:\n   HTML: {h}\n   TXT : {t}\n   CSV : {c}\n   PDF : {p}{C.END}")
+                h, t, c, p, j = reporter.build_ip_report(ip, geo if isinstance(geo, dict) else {"dato": geo}, str(ptr), rdap if isinstance(rdap, dict) else {"dato": rdap}, nombre=nombre, objetivo=objetivo, extra=extra)
+                print(f"\n {C.NY}{C.BOLD}Guardado en carpeta reportes/:\n   HTML: {h}\n   TXT : {t}\n   CSV : {c}\n   PDF : {p}\n   JSON: {j}{C.END}")
                 print(f" {C.D}Abre reportes/index.html en tu navegador para verlo super mejor.{C.END}")
             elif c == "6":
                 reps = reporter.list_reports()

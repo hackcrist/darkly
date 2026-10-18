@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -56,9 +56,20 @@ func showMenu(opts [][2]string) {
 }
 
 func printMap(m map[string]any) {
+	printMapOmit(m)
+}
+
+// printMapOmit imprime el mapa omitiendo claves concretas (p. ej. "verificacion").
+func printMapOmit(m map[string]any, omit ...string) {
+	skip := make(map[string]bool, len(omit))
+	for _, k := range omit {
+		skip[k] = true
+	}
 	keys := make([]string, 0, len(m))
 	for k := range m {
-		keys = append(keys, k)
+		if !skip[k] {
+			keys = append(keys, k)
+		}
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
@@ -69,6 +80,13 @@ func printMap(m map[string]any) {
 func pauseGo() {
 	fmt.Print("  Pulsa Enter para continuar...")
 	reader.ReadString('\n')
+}
+
+// timed ejecuta fn y muestra el tiempo real que tardo (interfaz mas realista).
+func timed(label string, fn func()) {
+	t0 := time.Now()
+	fn()
+	fmt.Printf("  %s[%s: %.2fs]%s\n", dim, label, time.Since(t0).Seconds(), end)
 }
 
 func confirmGo() bool {
@@ -113,9 +131,15 @@ func menuRedes() {
 		}
 		switch c {
 		case "1":
-			printMap(dnsCore(ask("Host")))
+			host := ask("Host")
+			var dns map[string]any
+			timed("DNS", func() { dns = dnsCore(host) })
+			printMap(dns)
 		case "2":
-			fmt.Println(pingCore(ask("Host")))
+			host := ask("Host")
+			var out string
+			timed("ping", func() { out = pingCore(host) })
+			fmt.Println(out)
 		case "3":
 			if !confirmGo() {
 				fmt.Println("  Escaneo cancelado.")
@@ -129,28 +153,15 @@ func menuRedes() {
 				break
 			}
 			fmt.Println("  Escaneando...")
-			ip, res := scanCore(host, plist, 1000, 100)
+			var ip string
+			var res map[string]map[string]any
+			timed("escaneo", func() { ip, res = scanCore(host, plist, 1000, 100) })
 			fmt.Println("  IP:", ip)
 			if _, bad := res["error"]; bad {
 				fmt.Println("  [!] no se pudo resolver:", host)
 				break
 			}
-			keys := make([]string, 0, len(res))
-			for k := range res {
-				keys = append(keys, k)
-			}
-			sort.Slice(keys, func(i, j int) bool {
-				ai, _ := strconv.Atoi(keys[i])
-				aj, _ := strconv.Atoi(keys[j])
-				return ai < aj
-			})
-			for _, k := range keys {
-				if open, _ := res[k]["open"].(bool); open {
-					fmt.Printf("   puerto %s : %sABIERTO%s -> %v\n", k, ng, end, res[k]["banner"])
-				} else {
-					fmt.Printf("   puerto %s : cerrado\n", k)
-				}
-			}
+			nmapTable("Escaneo de "+host, res)
 		case "4":
 			fmt.Println("  (usa: darkly-go traceroute <host>)")
 		case "5":
@@ -221,11 +232,32 @@ func menuIP() {
 		}
 		switch c {
 		case "1":
-			printMap(geoCore(ask("IP")))
+			ip := ask("IP")
+			var geo map[string]any
+			timed("geo multi-fuente", func() { geo = geoCore(ip) })
+			printMapOmit(geo, "verificacion")
+			if v, ok := geo["verificacion"].(map[string]any); ok {
+				fmt.Printf("  %s%s-- Verificacion multi-fuente --%s\n", np, bold, end)
+				fmt.Printf("   fuentes_ok=%v  fuentes_error=%v  coincide_pais=%v  coincide_asn=%v\n",
+					v["fuentes_ok"], v["fuentes_error"], v["coincide_pais"], v["coincide_asn"])
+				if avisos, ok := v["avisos"].([]string); ok {
+					for _, a := range avisos {
+						fmt.Printf("   %s[!] %s%s\n", no, a, end)
+					}
+				}
+				if det, ok := v["detalle"].([]map[string]any); ok {
+					for _, d := range det {
+						fmt.Printf("   %s- %v: %v / %v / %v%s\n", dim, d["fuente"], d["pais"], d["org"], d["asn"], end)
+					}
+				}
+			}
 		case "2":
 			fmt.Println("  PTR:", ptrCore(ask("IP")))
 		case "3":
-			printMap(rdapCore(ask("Dominio/IP")))
+			q := ask("Dominio/IP")
+			var rdap map[string]any
+			timed("RDAP", func() { rdap = rdapCore(q) })
+			printMap(rdap)
 		case "4":
 			fmt.Println("  Usa: darkly-go report --ip 8.8.8.8 --nombre casa")
 		default:

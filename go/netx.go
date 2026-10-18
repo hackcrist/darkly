@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -329,4 +330,77 @@ func scanCore(host string, plist []int, timeoutMs, workers int) (string, map[str
 	}()
 	wg.Wait()
 	return ip, res
+}
+
+// servicePorts: puerto -> servicio conocido (estilo nmap).
+var servicePorts = map[int]string{
+	20: "ftp-data", 21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp",
+	53: "domain", 80: "http", 110: "pop3", 143: "imap", 443: "https",
+	445: "microsoft-ds", 587: "submission", 993: "imaps", 995: "pop3s",
+	1433: "ms-sql", 3306: "mysql", 3389: "ms-wbt-server", 5432: "postgresql",
+	5900: "vnc", 6379: "redis", 8000: "http-alt", 8080: "http-alt", 8443: "https-alt",
+}
+
+// serviceName aproxima el servicio (estilo nmap) desde el puerto y el banner.
+func serviceName(port int, banner string) string {
+	b := strings.ToLower(banner)
+	switch {
+	case strings.HasPrefix(b, "ssh-") || strings.Contains(b, "openssh"):
+		return "ssh"
+	case strings.Contains(b, "http/"):
+		return "http"
+	case strings.Contains(b, "smtp"):
+		return "smtp"
+	case strings.Contains(b, "ftp"):
+		return "ftp"
+	case strings.Contains(b, "mysql"):
+		return "mysql"
+	case strings.Contains(b, "imap"):
+		return "imap"
+	case strings.Contains(b, "pop3"):
+		return "pop3"
+	case strings.Contains(b, "rdp") || strings.Contains(b, "remote desktop"):
+		return "ms-wbt-server"
+	case strings.Contains(b, "telnet"):
+		return "telnet"
+	}
+	if s, ok := servicePorts[port]; ok {
+		return s
+	}
+	return "unknown"
+}
+
+// nmapTable imprime el resultado de un escaneo con formato tipo nmap.
+func nmapTable(titulo string, res map[string]map[string]any) {
+	keys := make([]string, 0, len(res))
+	for k := range res {
+		if k != "error" {
+			keys = append(keys, k)
+		}
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		ai, _ := strconv.Atoi(keys[i])
+		aj, _ := strconv.Atoi(keys[j])
+		return ai < aj
+	})
+	fmt.Printf("\n  %-8s %-8s %-16s %s\n", "PORT", "STATE", "SERVICE", "DETALLE")
+	fmt.Println("  " + strings.Repeat("-", 58))
+	abiertos := 0
+	for _, k := range keys {
+		open, _ := res[k]["open"].(bool)
+		banner, _ := res[k]["banner"].(string)
+		estado, col, detalle := "closed", "", "-"
+		if open {
+			abiertos++
+			estado, col = "open", ng
+			detalle = banner
+			if detalle == "" {
+				detalle = "(sin banner)"
+			}
+		}
+		p, _ := strconv.Atoi(k)
+		fmt.Printf("  %-8s %s%-8s%s %-16s %s\n", k, col, estado, end, serviceName(p, banner), detalle)
+	}
+	fmt.Println("  " + strings.Repeat("-", 58))
+	fmt.Printf("  %s: %d abiertos / %d probados\n", titulo, abiertos, len(keys))
 }
