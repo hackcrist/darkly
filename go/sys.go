@@ -137,7 +137,12 @@ func cmdVerify(args []string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	esp := strings.ToLower(strings.Fields(fs.Arg(1))[0])
+	fields := strings.Fields(fs.Arg(1))
+	if len(fields) == 0 {
+		fmt.Fprintln(os.Stderr, "falta el hash esperado")
+		os.Exit(2)
+	}
+	esp := strings.ToLower(fields[0])
 	ok := strings.ToLower(hexsum) == esp
 	out := map[string]any{"calculado": hexsum, "esperado": esp, "coincide": ok}
 	if ok {

@@ -38,7 +38,7 @@ func bannerGo() {
 	fmt.Println(np + bold + " |____/ \\__,_|_|  |_|\\_\\\\_|\\__, |" + end)
 	fmt.Println(nv + bold + "                          |___/" + end)
 	fmt.Println("  Herramientas en Go " + ny + bold + "(educativo)" + end + "  " + ny + bold + "v2.1.0" + end)
-	fmt.Println("  Solo fines educativos. Úsalo con responsabilidad y autorización.\n")
+	fmt.Print("  Solo fines educativos. Úsalo con responsabilidad y autorización.\n\n")
 }
 
 func showMenu(opts [][2]string) {
@@ -78,7 +78,7 @@ func runMenu() {
 		showMenu([][2]string{{"1", "Redes"}, {"2", "Seguridad"}, {"3", "IP / Info"}, {"4", "Sistema"}, {"5", "Usuarios"}, {"0", "Salir"}})
 		switch ask("Elige") {
 		case "0":
-			fmt.Println("\n  Adiós.\n")
+			fmt.Print("\n  Adiós.\n\n")
 			return
 		case "1":
 			menuRedes()

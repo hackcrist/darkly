@@ -132,7 +132,10 @@ def tail_log(path: str, lines: int = 20) -> list[str]:
 def file_hash_verify(path: str, esperado: str, algo: str = "sha256") -> dict:
     """Precisión real: compara el hash calculado contra el esperado (verificación de descargas)."""
     calc = file_hash(path, algo)
-    esp = esperado.strip().lower().split()[0]  # admite formato 'hash  nombre'
+    esp = (esperado or "").strip().lower()
+    if not esp:
+        raise ValueError("Falta el hash esperado. Pega el hash a comparar (ej. el del sitio de descarga).")
+    esp = esp.split()[0]  # admite formato 'hash  nombre'
     ok = calc["hex"].lower() == esp
     return {"path": calc["path"], "algo": calc["algo"], "calculado": calc["hex"],
             "esperado": esp, "coincide": ok,

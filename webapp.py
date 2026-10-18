@@ -8,15 +8,19 @@ Segura por defecto:
   - La verificación de contraseñas solo por POST (nunca en la URL/logs).
 """
 import os
-import threading
 import time
+import hmac
+import threading
 from functools import wraps
 
 from flask import Flask, jsonify, request, send_from_directory
 
 from tools import networking, security, gathering, username
 
-app = Flask(__name__, static_folder="web", static_url_path="")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+WEB_DIR = os.path.join(BASE_DIR, "web")
+
+app = Flask(__name__, static_folder=WEB_DIR, static_url_path="")
 
 TOKEN = os.environ.get("DARKLY_TOKEN", "")
 ENABLE_SCAN = os.environ.get("ENABLE_SCAN", "0") == "1"
@@ -30,11 +34,18 @@ _last_cleanup = time.time()
 
 
 def _get_client_ip() -> str:
-    """Extrae la IP real de forma segura según configuración de proxy."""
+    """Extrae la IP real de forma segura según configuración de proxy.
+
+    Con TRUST_PROXY=1 se toma la ULTIMA entrada de X-Forwarded-For: es la que
+    añade tu proxy de confianza (la primera la puede falsear el cliente para
+    saltarse el límite por IP).
+    """
     if TRUST_PROXY:
         xff = request.headers.get("X-Forwarded-For", "")
         if xff:
-            return xff.split(",")[0].strip()
+            parts = [p.strip() for p in xff.split(",") if p.strip()]
+            if parts:
+                return parts[-1]
     return request.remote_addr or "127.0.0.1"
 
 
@@ -68,9 +79,10 @@ def limited(per_min=30):
 def need_token(fn):
     @wraps(fn)
     def wrapper(*a, **kw):
-        # Si requiere token, debe existir DARKLY_TOKEN configurado y coincidir
+        # Si requiere token, debe existir DARKLY_TOKEN configurado y coincidir.
+        # Comparacion en tiempo constante para no filtrar el token por timing.
         req_token = request.headers.get("X-Token", "").strip()
-        if not TOKEN or req_token != TOKEN:
+        if not TOKEN or not hmac.compare_digest(req_token, TOKEN):
             return jsonify({"error": "Requiere token de acceso válido (cabecera X-Token). Configura DARKLY_TOKEN en el servidor."}), 401
         return fn(*a, **kw)
     return wrapper
@@ -100,7 +112,7 @@ def api_health():
 
 @app.get("/")
 def index():
-    return send_from_directory("web", "index.html")
+    return send_from_directory(WEB_DIR, "index.html")
 
 
 @app.get("/api/dns")

@@ -6,6 +6,16 @@ import string
 import urllib.request
 
 
+def _ssl_ctx():
+    """Contexto HTTPS con certifi cuando esta disponible (evita CERTIFICATE_VERIFY_FAILED en Windows)."""
+    import ssl as _ssl
+    try:
+        import certifi
+        return _ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return _ssl.create_default_context()
+
+
 COMMON_PORTS = {
     21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp", 53: "dns",
     80: "http", 110: "pop3", 143: "imap", 443: "https",
@@ -72,8 +82,8 @@ def generate_password(length: int = 16) -> str:
 def check_security_headers(url: str, timeout: int = 10) -> dict:
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
-    req = urllib.request.Request(url, headers={"User-Agent": "Darkly-Tools/1.0 (educational)"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    req = urllib.request.Request(url, headers={"User-Agent": "Darkly-Tools/2.0 (educativo)"})
+    with urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx()) as r:
         headers = dict(r.headers)
     wanted = ["Content-Security-Policy", "Strict-Transport-Security",
               "X-Content-Type-Options", "X-Frame-Options",
@@ -91,13 +101,7 @@ def _fetch_range(prefix: str, timeout: int = 10) -> str:
     req = urllib.request.Request(
         f"https://api.pwnedpasswords.com/range/{prefix}",
         headers={"User-Agent": "Darkly-Tools/2.0 (educativo)", "Add-Padding": "true"})
-    import ssl as _ssl
-    try:
-        import certifi
-        ctx = _ssl.create_default_context(cafile=certifi.where())
-    except ImportError:
-        ctx = _ssl.create_default_context()
-    with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+    with urllib.request.urlopen(req, timeout=timeout, context=_ssl_ctx()) as r:
         body = r.read().decode()
     if len(_range_cache) >= _MAX_RANGE_CACHE:
         _range_cache.pop(next(iter(_range_cache)), None)

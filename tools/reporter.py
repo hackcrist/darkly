@@ -260,4 +260,4 @@ a{{color:#00ffea;text-decoration:none;font-weight:bold}}</style></head>
 
 def list_reports() -> list[str]:
     ensure_dir()
-    return sorted(os.listdir(BASE_DIR), reverse=True)
+    return sorted((a for a in os.listdir(BASE_DIR) if a != "index.html"), reverse=True)

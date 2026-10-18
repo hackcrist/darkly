@@ -14,13 +14,23 @@ BIN_PATH = os.path.join(GO_DIR, BIN_NAME)
 SRC_PATH = os.path.join(GO_DIR, "main.go")
 
 
+def _newest_source_mtime() -> float:
+    """Mtime mas reciente de las fuentes Go (todos los .go + go.mod/go.sum)."""
+    import glob
+    patterns = ("*.go", "go.mod", "go.sum")
+    files: list[str] = []
+    for pat in patterns:
+        files.extend(glob.glob(os.path.join(GO_DIR, pat)))
+    return max((os.path.getmtime(f) for f in files), default=0.0)
+
+
 def go_available() -> bool:
     return shutil.which("go") is not None
 
 
 def ensure_binary() -> str:
     """Devuelve la ruta del binario compilado o lanza RuntimeError."""
-    if os.path.isfile(BIN_PATH) and os.path.getmtime(BIN_PATH) >= os.path.getmtime(SRC_PATH):
+    if os.path.isfile(BIN_PATH) and os.path.getmtime(BIN_PATH) >= _newest_source_mtime():
         return BIN_PATH
     if not go_available():
         raise RuntimeError("Go no está instalado. Instálalo (https://go.dev/dl/) y reintenta. Respaldo: usa la opción Python.")

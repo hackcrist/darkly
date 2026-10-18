@@ -9,7 +9,7 @@ import concurrent.futures
 def resolve_host(host: str) -> str:
     try:
         return socket.gethostbyname(host)
-    except socket.gaierror as e:
+    except (OSError, UnicodeError) as e:
         return f"[!] Falló la resolución DNS: {e}"
 
 
@@ -25,7 +25,7 @@ def dns_lookup(host: str, timeout: int = 8) -> dict:
             result["addr_info"] = []
         result["fuente"] = "sistema"
         return result
-    except socket.gaierror as e:
+    except (OSError, UnicodeError) as e:
         result["error_sistema"] = str(e)
     # Respaldo DoH (HTTPS = casi nunca bloqueado)
     try:

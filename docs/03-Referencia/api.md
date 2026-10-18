@@ -46,5 +46,5 @@ Render o Railway con `gunicorn webapp:app`, variables `DARKLY_TOKEN` definida y 
 ## Consideraciones Críticas y Casos de Borde
 
 1. **Límites por IP:** de 5 a 60 peticiones por minuto según el costo del endpoint; al exceder responde 429 con mensaje de espera.
-2. **Confianza en proxy:** activar `TRUST_PROXY=1` solo detrás de un proxy propio; en internet directo permite falsificar la IP del límite.
+2. **Confianza en proxy:** con `TRUST_PROXY=1` se toma la última entrada de `X-Forwarded-For` (la que añade tu proxy de confianza; la primera la puede falsear el cliente para saltarse el límite). Actívalo solo detrás de un proxy propio.
 3. **Limpieza de memoria:** el registro de peticiones se purga cada 120 segundos para evitar crecimiento indefinido.
