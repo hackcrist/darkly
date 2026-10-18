@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -25,7 +26,12 @@ var reader = bufio.NewReader(os.Stdin)
 
 func ask(prompt string) string {
 	fmt.Printf(" %s%s>%s %s:%s ", nc, bold, end, prompt, end)
-	s, _ := reader.ReadString('\n')
+	s, err := reader.ReadString('\n')
+	if err != nil && strings.TrimSpace(s) == "" {
+		// Sin entrada (p. ej. un pipe): salir limpio en vez de entrar en bucle infinito.
+		fmt.Println()
+		os.Exit(0)
+	}
 	return strings.TrimSpace(s)
 }
 
@@ -125,11 +131,19 @@ func menuRedes() {
 			fmt.Println("  Escaneando...")
 			ip, res := scanCore(host, plist, 1000, 100)
 			fmt.Println("  IP:", ip)
+			if _, bad := res["error"]; bad {
+				fmt.Println("  [!] no se pudo resolver:", host)
+				break
+			}
 			keys := make([]string, 0, len(res))
 			for k := range res {
 				keys = append(keys, k)
 			}
-			sort.Strings(keys)
+			sort.Slice(keys, func(i, j int) bool {
+				ai, _ := strconv.Atoi(keys[i])
+				aj, _ := strconv.Atoi(keys[j])
+				return ai < aj
+			})
 			for _, k := range keys {
 				if open, _ := res[k]["open"].(bool); open {
 					fmt.Printf("   puerto %s : %sABIERTO%s -> %v\n", k, ng, end, res[k]["banner"])

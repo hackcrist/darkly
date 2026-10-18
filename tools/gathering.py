@@ -97,6 +97,9 @@ def subdomains_crtsh(domain: str, timeout: int = 15, limit: int = 50) -> dict:
             if intento < 2:
                 import time as _t
                 _t.sleep(3)
+    if not isinstance(data, list):
+        # crt.sh a veces responde con algo que no es lista (error/HTML): tratar como fallo.
+        data = None
     if data is None:
         # Respaldo gratis: HackerTarget hostsearch
         try:

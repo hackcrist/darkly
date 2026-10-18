@@ -79,12 +79,13 @@ func geoCore(ip string) map[string]any {
 
 func cmdIPInfo(args []string) {
 	fs := flag.NewFlagSet("ipinfo", flag.ExitOnError)
+	mia := fs.Bool("mia", false, "muestra tu IP publica (equivale a: ipinfo mia)")
 	fs.Parse(args)
-	if fs.NArg() == 0 {
+	if !*mia && fs.NArg() == 0 {
 		fmt.Fprintln(os.Stderr, "uso: darkly-go ipinfo <ip>  |  darkly-go ipinfo --mia")
 		os.Exit(2)
 	}
-	if fs.Arg(0) == "--mia" || fs.Arg(0) == "mia" {
+	if *mia || fs.Arg(0) == "mia" {
 		for _, u := range []string{
 			"http://ip-api.com/json/?fields=status,message,country,regionName,city,query,org,isp",
 			"https://ipapi.co/json/",

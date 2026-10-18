@@ -27,7 +27,8 @@ const goUA = "darkly-go/2.1 (educativo)"
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "uso: darkly-go <scan|dns> [flags]")
+		fmt.Fprintln(os.Stderr, "uso: darkly-go <comando> [flags]")
+		fmt.Fprintln(os.Stderr, "comandos: scan dns ping subnet traceroute hash hashid pass genpass audit breach headers urlscan ipinfo ptr rdap whois user dnsrecords subdomains ghuser sysinfo filehash verify report menu version")
 		os.Exit(2)
 	}
 	switch os.Args[1] {

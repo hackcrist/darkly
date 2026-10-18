@@ -82,12 +82,13 @@ func cmdReport(args []string) {
 	ping := pingCore(ip)
 	ports := map[string]string{}
 	if plist, err := parsePorts("22,80,443,8080,3389"); err == nil {
-		_, res := scanCore(ip, plist, 1000, 50)
-		for k, v := range res {
-			if open, _ := v["open"].(bool); open {
-				ports[k] = fmt.Sprintf("%v", v["banner"])
-			} else {
-				ports[k] = "cerrado"
+		if _, res := scanCore(ip, plist, 1000, 50); res["error"] == nil {
+			for k, v := range res {
+				if open, _ := v["open"].(bool); open {
+					ports[k] = fmt.Sprintf("%v", v["banner"])
+				} else {
+					ports[k] = "cerrado"
+				}
 			}
 		}
 	}
@@ -124,9 +125,7 @@ func cmdReport(args []string) {
 	sec("[2] DNS INVERSO (PTR)", ptr)
 	sec("[3] RDAP - REGISTRO PRECISO", kvText(rdap))
 	sec("[4] DNS DIRECTO / RESOLUCION", kvText(dns))
-	if len(ping) > 1500 {
-		ping = ping[:1500]
-	}
+	ping = truncStr(ping, 1500)
 	sec("[5] PING / LATENCIA", ping)
 	var pb strings.Builder
 	pkeys := make([]string, 0, len(ports))
@@ -145,25 +144,26 @@ func cmdReport(args []string) {
 
 	// ---------- CSV ----------
 	csvPath := filepath.Join(dir, "reporte_IP_"+tag+".csv")
-	cf, _ := os.Create(csvPath)
-	cw := csv.NewWriter(cf)
-	cw.Write([]string{"campo", "valor"})
-	cw.Write([]string{"fecha", fecha})
-	cw.Write([]string{"ip", ip})
-	cw.Write([]string{"objetivo", obj})
-	cw.Write([]string{"nombre", etag})
-	for k, v := range geo {
-		cw.Write([]string{"geo." + k, fmt.Sprintf("%v", v)})
+	if cf, err := os.Create(csvPath); err == nil {
+		cw := csv.NewWriter(cf)
+		cw.Write([]string{"campo", "valor"})
+		cw.Write([]string{"fecha", fecha})
+		cw.Write([]string{"ip", ip})
+		cw.Write([]string{"objetivo", obj})
+		cw.Write([]string{"nombre", etag})
+		for k, v := range geo {
+			cw.Write([]string{"geo." + k, fmt.Sprintf("%v", v)})
+		}
+		cw.Write([]string{"ptr", ptr})
+		for k, v := range rdap {
+			cw.Write([]string{"rdap." + k, fmt.Sprintf("%v", v)})
+		}
+		for _, k := range pkeys {
+			cw.Write([]string{"puerto." + k, ports[k]})
+		}
+		cw.Flush()
+		cf.Close()
 	}
-	cw.Write([]string{"ptr", ptr})
-	for k, v := range rdap {
-		cw.Write([]string{"rdap." + k, fmt.Sprintf("%v", v)})
-	}
-	for _, k := range pkeys {
-		cw.Write([]string{"puerto." + k, ports[k]})
-	}
-	cw.Flush()
-	cf.Close()
 
 	// ---------- HTML ----------
 	htmlPath := filepath.Join(dir, "reporte_IP_"+tag+".html")
@@ -223,10 +223,15 @@ func kvText(m map[string]any) string {
 }
 
 func truncStr(s string, n int) string {
-	if len(s) > n {
-		return s[:n]
+	if len(s) <= n {
+		return s
 	}
-	return s
+	// Recorta por runas para no partir caracteres UTF-8 (tildes, etc.).
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n])
 }
 
 func portsTable(ports map[string]string) string {

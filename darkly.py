@@ -126,7 +126,28 @@ def menu(options: list[tuple[str, str]]):
 
 
 def ask(prompt: str) -> str:
-    return input(f" {C.NC}{C.BOLD}>{C.END} {C.W}{prompt}:{C.END} ").strip()
+    try:
+        return input(f" {C.NC}{C.BOLD}>{C.END} {C.W}{prompt}:{C.END} ").strip()
+    except EOFError:
+        # Sin entrada (p. ej. un pipe o CI): salir limpio en vez de reventar.
+        print()
+        raise SystemExit(0)
+
+
+def ask_int(prompt: str, default: int | None = None, minimo: int | None = None, maximo: int | None = None) -> int:
+    """Pide un numero entero validado; evita que un texto suelto rompa el menu."""
+    raw = ask(prompt)
+    if raw == "" and default is not None:
+        return default
+    try:
+        valor = int(raw)
+    except ValueError:
+        raise ValueError(f"Se esperaba un numero entero y recibi '{raw}'.")
+    if minimo is not None and valor < minimo:
+        raise ValueError(f"Valor fuera de rango (minimo {minimo}).")
+    if maximo is not None and valor > maximo:
+        raise ValueError(f"Valor fuera de rango (maximo {maximo}).")
+    return valor
 
 
 def ok(msg: str):
@@ -165,7 +186,11 @@ def print_kv(data, indent: str = "   "):
 
 
 def pause():
-    input(f"\n {C.DIM}Pulsa Enter para continuar...{C.END}")
+    try:
+        input(f"\n {C.DIM}Pulsa Enter para continuar...{C.END}")
+    except EOFError:
+        print()
+        raise SystemExit(0)
 
 
 def confirm_auth() -> bool:
@@ -213,7 +238,7 @@ def networking_menu():
                 print_kv(networking.subnet_info(ask("CIDR (ej. 192.168.1.0/24)")))
             elif c == "6":
                 host = networking.validate_target(ask("Host/IP"))
-                port = int(ask("Puerto (ej. 22)"))
+                port = ask_int("Puerto (ej. 22)", minimo=1, maximo=65535)
                 ok(networking.banner_grab(host, port))
             elif c == "7":
                 host = networking.validate_target(ask("Host"))
@@ -242,8 +267,11 @@ def networking_menu():
                     warn(f"{e} Usando Python...")
                     ports = networking.parse_ports(prange)
                     res = networking.port_scan(host, ports)
-                    for p in sorted(res):
-                        print(f"   puerto {p}: {'ABIERTO' if res[p] else 'cerrado'}")
+                    if "error" in res:
+                        err(str(res["error"]))
+                    else:
+                        for p in sorted(res):
+                            print(f"   puerto {p}: {'ABIERTO' if res[p] else 'cerrado'}")
             else:
                 err("Opción no válida")
         except Exception as e:
@@ -273,11 +301,13 @@ def security_menu():
                 r = security.password_strength(pw)
                 print_kv(r)
             elif c == "4":
-                nueva = security.generate_password(int(ask("Longitud [16]") or 16))
+                nueva = security.generate_password(ask_int("Longitud [16]", default=16, minimo=8, maximo=64))
                 ok(f"Generada: {nueva}")
                 warn("Verificando que lo generado no esté filtrado...")
                 b = security.check_password_breach(nueva)
-                if b.get("comprometida"):
+                if b.get("error"):
+                    warn(f"No se pudo verificar contra filtraciones: {b['error']}")
+                elif b.get("comprometida"):
                     err(f"Ojo: lo generado aparece {b['veces_vista']} veces. Genera otra.")
                 else:
                     ok("Lo generado no aparece en filtraciones.")
@@ -407,7 +437,7 @@ def system_menu():
             elif c == "6":
                 print_kv(system_tools.check_permissions(ask("Ruta")))
             elif c == "7":
-                for line in system_tools.tail_log(ask("Ruta del log"), int(ask("Líneas [20]") or 20)):
+                for line in system_tools.tail_log(ask("Ruta del log"), ask_int("Líneas [20]", default=20, minimo=1, maximo=200)):
                     print(f"   {line}")
             else:
                 err("Opción no válida")

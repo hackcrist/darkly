@@ -80,15 +80,15 @@ def get_uptime() -> str:
 def list_processes(limit: int = 15) -> list[dict]:
     try:
         import psutil
-        procs = []
-        for p in psutil.process_iter(["pid", "name", "cpu_percent"]):
+        procs: list[dict] = []
+        for p in psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent"]):
             try:
                 procs.append(p.info)
             except Exception:
                 continue
-            if len(procs) >= limit:
-                break
-        return procs
+        # Antes se devolvian los primeros por orden de PID; ahora se ordenan por uso.
+        procs.sort(key=lambda x: (x.get("cpu_percent") or 0.0, x.get("memory_percent") or 0.0), reverse=True)
+        return procs[:limit]
     except ImportError:
         # Fallback: ps / tasklist
         import subprocess as _sp

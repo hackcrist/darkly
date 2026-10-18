@@ -11,7 +11,6 @@ import subprocess
 GO_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "go")
 BIN_NAME = "darkly-go.exe" if os.name == "nt" else "darkly-go"
 BIN_PATH = os.path.join(GO_DIR, BIN_NAME)
-SRC_PATH = os.path.join(GO_DIR, "main.go")
 
 
 def _newest_source_mtime() -> float:
@@ -54,7 +53,11 @@ def go_run(*args: str, timeout: int = 120) -> dict:
     """Llama cualquier subcomando darkly-go y devuelve el JSON.
     Ej: go_run("hash", "--algo", "sha256", "hola")"""
     binp = ensure_binary()
-    r = subprocess.run([binp, *args], capture_output=True, text=True, timeout=timeout)
+    r = subprocess.run([binp, *args], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", timeout=timeout)
+    if r.returncode != 0:
+        detalle = (r.stderr or "").strip() or (r.stdout or "").strip()
+        raise RuntimeError(f"darkly-go falló (código {r.returncode}): {detalle[:200]}")
     if not r.stdout.strip():
-        raise RuntimeError(f"darkly-go no devolvió nada: {r.stderr[:200]}")
+        raise RuntimeError(f"darkly-go no devolvió nada: {(r.stderr or '')[:200]}")
     return json.loads(r.stdout)

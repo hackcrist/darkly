@@ -102,8 +102,6 @@ func fileHashCore(path, algo string) (string, int64, error) {
 			return "", 0, err
 		}
 	}
-	abs, _ := filepath.Abs(path)
-	_ = abs
 	return hex.EncodeToString(h.Sum(nil)), total, nil
 }
 
