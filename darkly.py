@@ -9,6 +9,9 @@ import sys
 import time
 import contextlib
 
+# Asegura que tools/ sea importable desde cualquier carpeta
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 __version__ = "2.0.0"
 
 # Fuerza UTF-8 en consola Windows para evitar errores con tildes/cajas

@@ -27,7 +27,10 @@ Colección de herramientas de redes, seguridad y OSINT pasivo para la terminal, 
 
 - Python 3.10 o superior (obligatorio).
 - Go 1.21 o superior (opcional, activa los módulos rápidos).
+- pytest (opcional, para ejecutar los tests).
 - Conexión a internet para las fuentes OSINT.
+
+Para la **API web** es obligatoria la variable de entorno `DARKLY_TOKEN`; sin ella `webapp.py` no arranca.
 
 Verificado en Python 3.12 y Go 1.27 sobre Windows. Los módulos locales (hash, subredes, permisos, reportes) funcionan sin internet.
 
@@ -45,9 +48,15 @@ cd go && go build -o darkly-go.exe .   # en Linux: go build -o darkly-go .
 O con el instalador, que detecta el sistema, instala dependencias y compila Go:
 
 ```bash
-python install.py            # Termux, Linux y Windows
+python install.py            # Termux, Linux (apt o pacman) y Windows
 python install.py --dry-run  # solo muestra lo que haría, sin cambios
 ```
+
+El instalador detecta automáticamente:
+- **Termux:** `pkg`
+- **Debian/Ubuntu:** `apt`
+- **Arch/Garuda:** `pacman`
+- **Windows:** verifica Python y Go (winget si faltan)
 
 En Android usa Termux (desde F-Droid o GitHub, nunca Play Store): `pkg install git python -y`, clona el repositorio y ejecuta `python install.py`. Sin root funciona todo excepto algunos modos de traceroute.
 
@@ -134,10 +143,22 @@ El SHA-256 de la evidencia se imprime en el resto de formatos, así se puede com
 
 ```bash
 pip install -r requirements-web.txt
+export DARKLY_TOKEN=tu_token_aqui
 python webapp.py
 ```
 
+**`DARKLY_TOKEN` es obligatorio:** si no está definida, la API se niega a arrancar.  
 `web/` incluye una demo mínima. El escaneo está desactivado por defecto. Endpoints, autenticación y variables de entorno: **[docs/03-Referencia/api.md](docs/03-Referencia/api.md)**.
+
+## Tests
+
+```bash
+pip install pytest
+pytest tests/test_darkly.py -v     # Python
+cd go && go test ./...              # Go
+```
+
+También hay un workflow de GitHub Actions (`.github/workflows/test.yml`) que corre los tests en Ubuntu y Windows en cada push/PR.
 
 ## Estructura
 

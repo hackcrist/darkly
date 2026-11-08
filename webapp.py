@@ -23,6 +23,11 @@ WEB_DIR = os.path.join(BASE_DIR, "web")
 app = Flask(__name__, static_folder=WEB_DIR, static_url_path="")
 
 TOKEN = os.environ.get("DARKLY_TOKEN", "")
+if not TOKEN:
+    raise SystemExit(
+        "Falta DARKLY_TOKEN. Configúrala antes de iniciar la API web, "
+        "ejemplo: export DARKLY_TOKEN=tu_token_aqui"
+    )
 ENABLE_SCAN = os.environ.get("ENABLE_SCAN", "0") == "1"
 RATE_LIMIT_ENABLED = os.environ.get("RATE_LIMIT_ENABLED", "1") == "1"
 TRUST_PROXY = os.environ.get("TRUST_PROXY", "0") == "1"

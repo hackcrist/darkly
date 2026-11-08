@@ -64,12 +64,22 @@ def main():
              "iputils", "traceroute", "procps", "clang"])
         req = "requirements-termux.txt"
     elif system == "linux":
-        say("[1/4] apt update...", "y")
-        run(["sudo", "apt", "update"])
-        say("[2/4] Paquetes del sistema...", "y")
-        run(["sudo", "apt", "install", "-y", "python3", "python3-pip",
-             "golang", "git", "iputils-ping", "traceroute", "procps",
-             "build-essential"])
+        # Detectar Arch/Garuda (pacman) vs Debian/Ubuntu (apt)
+        use_pacman = shutil.which("pacman") is not None
+        if use_pacman:
+            say("[1/4] pacman -Syu...", "y")
+            run(["sudo", "pacman", "-Syu", "--needed", "--noconfirm"])
+            say("[2/4] Paquetes del sistema...", "y")
+            run(["sudo", "pacman", "-S", "--needed", "--noconfirm",
+                 "python", "python-pip", "go", "git", "inetutils",
+                 "traceroute", "procps-ng", "base-devel"])
+        else:
+            say("[1/4] apt update...", "y")
+            run(["sudo", "apt", "update"])
+            say("[2/4] Paquetes del sistema...", "y")
+            run(["sudo", "apt", "install", "-y", "python3", "python3-pip",
+                 "golang", "git", "iputils-ping", "traceroute", "procps",
+                 "build-essential"])
         req = "requirements.txt"
     elif system == "windows":
         say("[1/4] Verificando Python y Go...", "y")
