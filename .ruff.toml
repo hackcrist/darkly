@@ -1,0 +1,9 @@
+[lint]
+select = ["E", "F", "W", "C90", "N", "UP", "PYI", "B", "A", "I", "Q", "SIM", "TRY", "DTZ", "RET", "BLE", "RUF"]
+ignore = ["E501", "B008"]
+fix = false
+unsafe-fixes = false
+target-version = "py310"
+
+[format]
+line-length = 88

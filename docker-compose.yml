@@ -1,0 +1,11 @@
+# darkly-tools-api
+image: hackcrist/darkly-api:latest
+build:
+  context: .
+  dockerfile: Dockerfile
+ports:
+  - "5000:5000"
+environment:
+  - DARKLY_TOKEN=${DARKLY_TOKEN}
+  - ENABLE_SCAN=0
+  - RATE_LIMIT_ENABLED=1

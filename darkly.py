@@ -4,15 +4,44 @@
 Darkly Tools | Herramientas de Linux y seguridad
 Solo fines educativos. Uso responsable y autorizado.
 """
+import contextlib
+import logging
 import os
 import sys
 import time
-import contextlib
+from typing import Any
 
 # Asegura que tools/ sea importable desde cualquier carpeta
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from exceptions import DarklyError
+
 __version__ = "2.0.0"
+
+# --- Configuración de logging ---
+LOG = logging.getLogger("darkly")
+LOG.setLevel(logging.INFO)
+
+if not LOG.handlers:
+    _ch = logging.StreamHandler(sys.stderr)
+    _ch.setLevel(logging.INFO)
+    _fmt = logging.Formatter("[%(levelname)s] %(message)s")
+    _ch.setFormatter(_fmt)
+    LOG.addHandler(_ch)
+    LOG.propagate = False
+
+def log_error(msg: str, exc: Exception | None = None) -> None:
+    """Registra error en stderr y opcionalmente incluye la excepción."""
+    if exc:
+        LOG.error("%s | %s", msg, exc)
+    else:
+        LOG.error(msg)
+
+def log_info(msg: str) -> None:
+    """Registra mensaje informativo."""
+    LOG.info(msg)
+
+__all__ = ["__version__", "log_error", "log_info", "DarklyError"]
 
 # Fuerza UTF-8 en consola Windows para evitar errores con tildes/cajas
 try:
@@ -647,7 +676,7 @@ def ip_menu():
         pause()
 
 
-def main():
+def main() -> None:
     clear(); show_banner()
     while True:
         print(f" {C.NP}{C.BOLD}+-- MENU PRINCIPAL ------------------------------+{C.END}")

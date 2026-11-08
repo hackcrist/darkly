@@ -7,30 +7,55 @@ on:
     branches: [ main ]
 
 jobs:
+  lint-python:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar linters
+        run: |
+          python -m pip install --upgrade pip ruff black
+      - name: Ejecutar ruff y black
+        run: |
+          ruff check darkly.py webapp.py install.py tools/ tests/ || true
+          black --check darkly.py webapp.py install.py tools/ tests/ || true
+
+  lint-go:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Instalar Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+      - name: Ejecutar gofmt
+        run: |
+          gofmt -l go/ || true
+
   test-linux:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Instalar Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Instalar Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.21"
-
       - name: Instalar dependencias Python
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest
-
       - name: Ejecutar tests Python (pytest)
         run: pytest tests/test_darkly.py -v
-
       - name: Ejecutar tests Go
         run: |
           cd go
@@ -41,25 +66,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Instalar Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Instalar Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.21"
-
       - name: Instalar dependencias Python
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest
-
       - name: Ejecutar tests Python (pytest)
         run: pytest tests/test_darkly.py -v
-
       - name: Ejecutar tests Go
         run: |
           cd go

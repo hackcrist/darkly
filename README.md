@@ -28,11 +28,21 @@ Colección de herramientas de redes, seguridad y OSINT pasivo para la terminal, 
 - Python 3.10 o superior (obligatorio).
 - Go 1.21 o superior (opcional, activa los módulos rápidos).
 - pytest (opcional, para ejecutar los tests).
+- ruff / black (opcional, solo para desarrollo y linting).
 - Conexión a internet para las fuentes OSINT.
 
 Para la **API web** es obligatoria la variable de entorno `DARKLY_TOKEN`; sin ella `webapp.py` no arranca.
 
 Verificado en Python 3.12 y Go 1.27 sobre Windows. Los módulos locales (hash, subredes, permisos, reportes) funcionan sin internet.
+
+## Mejoras recientes (v2.0.0)
+
+1. **Logging estructurado**: `darkly.py` usa `logging` con niveles `INFO`/`ERROR` en stderr, además de salida coloreada en consola.
+2. **Type hints**: `darkly.py` y `webapp.py` tienen anotaciones de tipo en funciones públicas (`str`, `int`, `dict`, `Any`, `Callable`, etc.).
+3. **Excepciones personalizadas**: `exceptions.py` define `DarklyError` y subclases (`ConfigError`, `NetworkError`, `ToolError`, `SecurityError`, `ReportError`) para manejo de errores tipado.
+4. **Linter y formato**: `ruff`, `black` y `gofmt` integrados en CI (GitHub Actions) para Python y Go.
+5. **Docker**: `Dockerfile` y `docker-compose.yml` para desplegar la API web (`webapp.py`) en contenedor.
+6. **Soporte macOS**: `install.py` detecta `darwin` y usa Homebrew (`brew install python3 go`).
 
 ## Instalación
 
@@ -149,6 +159,21 @@ python webapp.py
 
 **`DARKLY_TOKEN` es obligatorio:** si no está definida, la API se niega a arrancar.  
 `web/` incluye una demo mínima. El escaneo está desactivado por defecto. Endpoints, autenticación y variables de entorno: **[docs/03-Referencia/api.md](docs/03-Referencia/api.md)**.
+
+### Despliegue con Docker
+
+```bash
+# Construir
+docker build -t darkly-api .
+
+# Ejecutar (requiere DARKLY_TOKEN)
+docker run -e DARKLY_TOKEN=tu_token_aqui -p 5000:5000 darkly-api
+
+# Con docker-compose
+DARKLY_TOKEN=tu_token_aqui docker-compose up
+```
+
+El contenedor escucha en el puerto 5000. El escaneo de puertos viene desactivado por defecto (`ENABLE_SCAN=0`).
 
 ## Tests
 

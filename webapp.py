@@ -12,8 +12,9 @@ import time
 import hmac
 import threading
 from functools import wraps
+from typing import Any, Callable
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, Response
 
 from tools import networking, security, gathering, username
 
@@ -54,10 +55,11 @@ def _get_client_ip() -> str:
     return request.remote_addr or "127.0.0.1"
 
 
-def limited(per_min=30):
-    def deco(fn):
+def limited(per_min: int = 30) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """Decorador de límite de peticiones por IP y minuto."""
+    def deco(fn: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(fn)
-        def wrapper(*a, **kw):
+        def wrapper(*a: Any, **kw: Any) -> Any:
             if not RATE_LIMIT_ENABLED:
                 return fn(*a, **kw)
             ip = _get_client_ip()
@@ -81,11 +83,10 @@ def limited(per_min=30):
     return deco
 
 
-def need_token(fn):
+def need_token(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """Decorador que exige cabecera X-Token válida (comparación en tiempo constante)."""
     @wraps(fn)
-    def wrapper(*a, **kw):
-        # Si requiere token, debe existir DARKLY_TOKEN configurado y coincidir.
-        # Comparacion en tiempo constante para no filtrar el token por timing.
+    def wrapper(*a: Any, **kw: Any) -> Any:
         req_token = request.headers.get("X-Token", "").strip()
         if not TOKEN or not hmac.compare_digest(req_token, TOKEN):
             return jsonify({"error": "Requiere token de acceso válido (cabecera X-Token). Configura DARKLY_TOKEN en el servidor."}), 401
@@ -111,18 +112,18 @@ def add_security_and_cors(response):
 
 
 @app.route("/api/health", methods=["GET"])
-def api_health():
+def api_health() -> Response:
     return jsonify({"status": "ok", "scan_enabled": ENABLE_SCAN, "rate_limited": RATE_LIMIT_ENABLED})
 
 
 @app.get("/")
-def index():
+def index() -> Response:
     return send_from_directory(WEB_DIR, "index.html")
 
 
 @app.get("/api/dns")
 @limited(60)
-def api_dns():
+def api_dns() -> Response:
     host = request.args.get("host", "").strip()
     if not host:
         return jsonify({"error": "Falta ?host="}), 400
@@ -134,7 +135,7 @@ def api_dns():
 
 @app.get("/api/geo")
 @limited(60)
-def api_geo():
+def api_geo() -> Response:
     ip = request.args.get("ip", "").strip()
     if not ip:
         return jsonify({"error": "Falta ?ip="}), 400
@@ -143,7 +144,7 @@ def api_geo():
 
 @app.get("/api/ptr")
 @limited(60)
-def api_ptr():
+def api_ptr() -> Response:
     ip = request.args.get("ip", "").strip()
     if not ip:
         return jsonify({"error": "Falta ?ip="}), 400
@@ -152,7 +153,7 @@ def api_ptr():
 
 @app.get("/api/rdap")
 @limited(30)
-def api_rdap():
+def api_rdap() -> Response:
     q = request.args.get("q", "").strip()
     if not q:
         return jsonify({"error": "Falta ?q="}), 400
@@ -164,7 +165,7 @@ def api_rdap():
 
 @app.get("/api/headers")
 @limited(30)
-def api_headers():
+def api_headers() -> Response:
     url = request.args.get("url", "").strip()
     if not url:
         return jsonify({"error": "Falta ?url="}), 400
@@ -176,7 +177,7 @@ def api_headers():
 
 @app.get("/api/urlscan")
 @limited(60)
-def api_urlscan():
+def api_urlscan() -> Response:
     url = request.args.get("url", "").strip()
     if not url:
         return jsonify({"error": "Falta ?url="}), 400
@@ -188,7 +189,7 @@ def api_urlscan():
 
 @app.get("/api/hash")
 @limited(60)
-def api_hash():
+def api_hash() -> Response:
     text = request.args.get("text", "")
     algo = request.args.get("algo", "sha256")
     if not text:
@@ -203,7 +204,7 @@ def api_hash():
 
 @app.get("/api/subdomains")
 @limited(10)
-def api_subdomains():
+def api_subdomains() -> Response:
     domain = request.args.get("domain", "").strip()
     if not domain:
         return jsonify({"error": "Falta ?domain="}), 400
@@ -215,7 +216,7 @@ def api_subdomains():
 
 @app.get("/api/ghuser")
 @limited(30)
-def api_ghuser():
+def api_ghuser() -> Response:
     u = request.args.get("u", "").strip()
     if not u:
         return jsonify({"error": "Falta ?u="}), 400
@@ -227,7 +228,7 @@ def api_ghuser():
 
 @app.get("/api/user")
 @limited(5)
-def api_user():
+def api_user() -> Response:
     u = request.args.get("u", "").strip()
     if not u:
         return jsonify({"error": "Falta ?u="}), 400
@@ -240,7 +241,7 @@ def api_user():
 
 @app.post("/api/breach")
 @limited(10)
-def api_breach():
+def api_breach() -> Response:
     data = request.get_json(silent=True) or {}
     pw = data.get("password", "")
     if not isinstance(pw, str) or not pw:
@@ -255,7 +256,7 @@ def api_breach():
 @app.get("/api/scan")
 @limited(5)
 @need_token
-def api_scan():
+def api_scan() -> Response:
     if not ENABLE_SCAN:
         return jsonify({"error": "Escaneo desactivado en este servidor (ENABLE_SCAN=0)."}), 403
     host = request.args.get("host", "").strip()
@@ -270,7 +271,7 @@ def api_scan():
     res = networking.port_scan(host, plist)
     if "error" in res:
         return jsonify({"error": str(res["error"])}), 400
-    out = {}
+    out: dict[str, Any] = {}
     for p, is_open in res.items():
         if p == "error":
             continue

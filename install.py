@@ -91,6 +91,15 @@ def main():
                     "Go con: winget install GoLang.Go", "r")
         say("[2/4] (Windows no necesita paquetes del sistema)", "y")
         req = "requirements.txt"
+    elif system == "darwin":
+        say("[1/4] Verificando Python y Go...", "y")
+        for tool in ("python3", "go"):
+            if shutil.which(tool):
+                say(f"  {tool} OK", "g")
+            else:
+                say(f"  {tool} no encontrado. Instálalo con: brew install {tool}", "r")
+        say("[2/4] (macOS usa Homebrew; trayecto rápido)", "y")
+        req = "requirements.txt"
     else:
         say(f"Sistema no reconocido: {system}", "r")
         sys.exit(1)
