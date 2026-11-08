@@ -1,155 +1,157 @@
 # Darkly Tools
 
 <p align="center">
-  <img src="assets/logo.svg" alt="Darkly Tools" width="600">
+  <img src="assets/logo.svg" alt="Darkly Tools" width="500">
 </p>
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
-![Go](https://img.shields.io/badge/Go-1.21%2B-00ADD8?style=flat-square&logo=go&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
-![Version](https://img.shields.io/badge/Version-2.0-ff00ff?style=flat-square)
-![Platform](https://img.shields.io/badge/Windows%20%7C%20Linux-OK-00ffea?style=flat-square)
+<p align="center">
+  <b>Colección de herramientas de redes, seguridad y OSINT pasivo para la terminal</b>
+</p>
 
-Colección de herramientas de redes, seguridad y OSINT pasivo para la terminal, en español y con menús a color. Incluye una implementación en Python (`darkly.py`), su gemela en Go (`darkly-go`) con los mismos módulos, y una API web opcional.
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Go-1.21%2B-00ADD8?style=for-the-badge&logo=go&logoColor=white"/>
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/Version-2.0-ff00ff?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Termux-OK-00ffea?style=for-the-badge"/>
+</p>
 
-> **Solo fines educativos.** Úsalo con responsabilidad y autorización. El escaneo de puertos exige confirmación explícita.
+---
 
-## Características
+## 📖 ¿Qué es Darkly?
 
-- **Redes:** DNS con respaldo DoH, ping, traceroute, calculadora de subred, banner grab y escaneo de puertos concurrente con tabla estilo nmap.
-- **Seguridad:** hashes e identificación, fortaleza y generador de contraseñas, cabeceras HTTP, detector de phishing y auditoría HIBP con k-anonymity.
-- **OSINT pasivo:** GeoIP de tres fuentes con ASN y verificación de acuerdos, PTR, RDAP, WHOIS, registros DNS, subdominios (crt.sh), perfil de GitHub y búsqueda en 17 sitios.
-- **Sistema:** info y disco, CPU/RAM, uptime, procesos, hash y verificación de archivos, permisos y logs.
-- **Reportes:** informe detallado por IP en HTML, TXT, CSV, PDF y JSON de evidencia con SHA-256.
-- **Python + Go:** el menú en Python llama a los subcomandos Go por JSON y, si Go no está instalado, usa su propio código.
+**Darkly Tools** es una suite de código abierto escrita en **Python** y **Go** diseñada para auditoría pasiva, reconocimiento de redes y OSINT desde la línea de comandos. Incluye:
 
-## Requisitos
+- Menú interactivo en español con colores neon.
+- Menú 100% en Go (`darkly-go`) con salida JSON.
+- API web opcional (Flask) con autenticación por token y límite de peticiones.
+- Generación de reportes en HTML, TXT, CSV, PDF y JSON con SHA-256.
+- Instalador multiplataforma (`install.py`) para Termux, Linux (apt/pacman), Windows y macOS.
 
-- Python 3.10 o superior (obligatorio).
-- Go 1.21 o superior (opcional, activa los módulos rápidos).
-- pytest (opcional, para ejecutar los tests).
-- ruff / black (opcional, solo para desarrollo y linting).
-- Conexión a internet para las fuentes OSINT.
+> **⚠️ Solo fines educativos.** Úsalo únicamente en sistemas propios o con autorización escrita. El escaneo de puertos exige confirmación explícita.
 
-Para la **API web** es obligatoria la variable de entorno `DARKLY_TOKEN`; sin ella `webapp.py` no arranca.
+---
 
-Verificado en Python 3.12 y Go 1.27 sobre Windows. Los módulos locales (hash, subredes, permisos, reportes) funcionan sin internet.
+## ✨ Características
 
-## Mejoras recientes (v2.0.0)
+| Categoría | Módulos |
+|-----------|---------|
+| 🌐 **Redes** | DNS con respaldo DoH, ping, traceroute, calculadora de subred, banner grab, escaneo de puertos concurrente (estilo nmap). |
+| 🔒 **Seguridad** | Hashes e identificación, fortaleza y generador de contraseñas, cabeceras HTTP, detector de phishing, auditoría HIBP con k-anonymity. |
+| 🔍 **OSINT pasivo** | GeoIP de tres fuentes con ASN, PTR, RDAP, WHOIS, registros DNS, subdominios (crt.sh), perfil de GitHub, búsqueda en 17 sitios. |
+| 💻 **Sistema** | Info y disco, CPU/RAM, uptime, procesos, hash y verificación de archivos, permisos, logs. |
+| 📄 **Reportes** | Informe detallado por IP en HTML, TXT, CSV, PDF y JSON de evidencia con SHA-256. |
+| 🐍 **Python + Go** | Doble implementación: el menú Python llama a subcomandos Go por JSON; si no hay Go, usa su propio código. |
 
-1. **Logging estructurado**: `darkly.py` usa `logging` con niveles `INFO`/`ERROR` en stderr, además de salida coloreada en consola.
-2. **Type hints**: `darkly.py` y `webapp.py` tienen anotaciones de tipo en funciones públicas (`str`, `int`, `dict`, `Any`, `Callable`, etc.).
-3. **Excepciones personalizadas**: `exceptions.py` define `DarklyError` y subclases (`ConfigError`, `NetworkError`, `ToolError`, `SecurityError`, `ReportError`) para manejo de errores tipado.
-4. **Linter y formato**: `ruff`, `black` y `gofmt` integrados en CI (GitHub Actions) para Python y Go.
-5. **Docker**: `Dockerfile` y `docker-compose.yml` para desplegar la API web (`webapp.py`) en contenedor.
-6. **Soporte macOS**: `install.py` detecta `darwin` y usa Homebrew (`brew install python3 go`).
+---
 
-## Instalación
+## 📦 Instalación
+
+### Opción A: Instalador automático (`install.py`)
 
 ```bash
 git clone https://github.com/hackcrist/darkly.git
 cd darkly
+python install.py
+```
+
+El instalador detecta automáticamente tu sistema:
+
+| Sistema | Gestor de paquetes |
+|---------|-------------------|
+| Termux (Android) | `pkg` |
+| Debian / Ubuntu | `apt` |
+| Arch / Garuda | `pacman` |
+| Windows | Verifica Python y Go (winget si faltan) |
+| macOS | Homebrew (`brew`) |
+
+Luego ejecuta:
+
+```bash
+python darkly.py
+```
+
+### Opción B: Manual
+
+```bash
+git clone https://github.com/hackcrist/darkly.git
+cd darkly
+
+# Dependencias Python
 pip install -r requirements.txt
 
-# Go opcional (habilita los módulos rápidos)
-cd go && go build -o darkly-go.exe .   # en Linux: go build -o darkly-go .
+# Go opcional (módulos rápidos)
+cd go && go build -o darkly-go .   # Windows: go build -o darkly-go.exe .
+cd ..
 ```
 
-O con el instalador, que detecta el sistema, instala dependencias y compila Go:
+### Ejecutar
 
 ```bash
-python install.py            # Termux, Linux (apt o pacman) y Windows
-python install.py --dry-run  # solo muestra lo que haría, sin cambios
+# Menú interactivo (Python)
+python darkly.py
+
+# Ver versión
+python darkly.py --version
+
+# Menú interactivo (Go)
+go/darkly-go menu
 ```
 
-El instalador detecta automáticamente:
-- **Termux:** `pkg`
-- **Debian/Ubuntu:** `apt`
-- **Arch/Garuda:** `pacman`
-- **Windows:** verifica Python y Go (winget si faltan)
+---
 
-En Android usa Termux (desde F-Droid o GitHub, nunca Play Store): `pkg install git python -y`, clona el repositorio y ejecuta `python install.py`. Sin root funciona todo excepto algunos modos de traceroute.
+## 🚀 Uso rápido
 
-## Uso
+### Menú Python
 
-```bash
-python darkly.py            # menú interactivo en Python
-python darkly.py --version  # ver versión
-go/darkly-go.exe menu       # menú 100% en Go
+```
+1) Redes
+2) Seguridad
+3) Recolección info
+4) Sistema
+5) IP / Info por IP
+0) Salir
 ```
 
-Módulos del menú principal:
+### Comandos Go (`darkly-go`)
 
-- **Redes:** DNS con DoH, ping, escaneo de puertos, traceroute, subredes, banner grab y versiones rápidas en Go.
-- **Seguridad:** hash e identificación, fortaleza y generador, cabeceras, análisis de URL y auditoría HIBP.
-- **Recolección:** mi IP, consulta de IP, cabeceras HTTP, PTR, WHOIS, RDAP, usuarios, registros DNS, subdominios y GitHub.
-- **Sistema:** info y disco, uptime, procesos, hash y verificación de archivos, permisos y logs.
-- **IP:** mi IP, info por IP, PTR, RDAP e informe completo con auto-guardado.
+| Comando | Uso ejemplo |
+|---------|-------------|
+| `scan` | `./darkly-go scan --host 127.0.0.1 --ports 22,80,443` |
+| `dns` | `./darkly-go dns --host google.com` |
+| `ping` | `./darkly-go ping google.com` |
+| `subnet` | `./darkly-go subnet 192.168.1.0/24` |
+| `traceroute` | `./darkly-go traceroute --hops 20 google.com` |
+| `hash` | `./darkly-go hash --algo sha256 "texto"` |
+| `hashid` | `./darkly-go hashid 5d41402abc4b2a76b9719d911017c592` |
+| `pass` | `./darkly-go pass "contraseña"` |
+| `genpass` | `./darkly-go genpass --n 16` |
+| `audit` | `./darkly-go audit "contraseña"` |
+| `breach` | `./darkly-go breach "contraseña"` |
+| `headers` | `./darkly-go headers https://ejemplo.com` |
+| `urlscan` | `./darkly-go urlscan https://ejemplo.com` |
+| `ipinfo` | `./darkly-go ipinfo 8.8.8.8` o `mia` |
+| `ptr` | `./darkly-go ptr 8.8.8.8` |
+| `rdap` | `./darkly-go rdap google.com` |
+| `whois` | `./darkly-go whois google.com` |
+| `user` | `./darkly-go user torvalds` |
+| `dnsrecords` | `./darkly-go dnsrecords google.com` |
+| `subdomains` | `./darkly-go subdomains google.com` |
+| `ghuser` | `./darkly-go ghuser torvalds` |
+| `sysinfo` | `./darkly-go sysinfo` |
+| `filehash` | `./darkly-go filehash --algo sha256 archivo` |
+| `verify` | `./darkly-go verify --algo sha256 archivo hash` |
+| `report` | `./darkly-go report --ip 8.8.8.8 --nombre casa` |
+| `menu` | `./darkly-go menu` |
+| `version` | `./darkly-go version` |
 
-### Comandos Go
+---
 
-`darkly-go` expone cada módulo como subcomando con salida JSON. En Linux sustituye `./darkly-go.exe` por `./darkly-go`.
+## 🌐 API web
 
-| Comando | Uso |
-|---|---|
-| `scan` | `--host 127.0.0.1 --ports 22,80,443 [--timeout 1000] [--workers 100]` |
-| `dns` | `--host google.com` |
-| `ping` | `google.com` |
-| `subnet` | `192.168.1.0/24` |
-| `traceroute` | `[--hops 20] google.com` |
-| `hash` | `[--algo sha256] "texto"` |
-| `hashid` | `5d41402abc4b2a76b9719d911017c592` |
-| `pass` | `"contraseña"` |
-| `genpass` | `[--n 16]` |
-| `audit` | `"contraseña"` |
-| `breach` | `"contraseña"` |
-| `headers` | `https://ejemplo.com` |
-| `urlscan` | `https://ejemplo.com` |
-| `ipinfo` | `8.8.8.8` o `mia` (mi IP pública) |
-| `ptr` | `8.8.8.8` |
-| `rdap` | `google.com` o `8.8.8.8` |
-| `whois` | `google.com` |
-| `user` | `torvalds` |
-| `dnsrecords` | `google.com` |
-| `subdomains` | `google.com` |
-| `ghuser` | `torvalds` |
-| `sysinfo` | Sin argumentos |
-| `filehash` | `[--algo sha256] archivo` |
-| `verify` | `[--algo sha256] archivo hash` |
-| `report` | `--ip 8.8.8.8 [--objetivo casa.com] [--nombre casa] [--outdir reportes]` |
-| `menu` | Menú interactivo en Go |
-| `version` | Versión |
+`webapp.py` expone consultas pasivas por HTTP con límite de peticiones por IP y minuto.
 
-```bash
-./darkly-go.exe scan --host 127.0.0.1 --ports 22,80,443   # escaneo concurrente
-./darkly-go.exe ipinfo 8.8.8.8                            # geo triple fuente con ASN
-./darkly-go.exe report --ip 8.8.8.8 --nombre casa         # informe completo
-```
-
-## Capturas
-
-<p align="center">
-  <img src="assets/windows-terminal.png" alt="Darkly en Windows Terminal" width="700">
-</p>
-
-| Web | Termux |
-|---|---|
-| <img src="assets/web.png" alt="Darkly Web" width="300"> | <img src="assets/termux.jpeg" alt="Termux" width="130"> |
-
-## Reportes
-
-Cada consulta de IP genera cinco archivos en `reportes/` (carpeta auto-creada, no se sube a git) más un índice `index.html`:
-
-- **TXT** de 10 secciones: geo, PTR, RDAP, DNS, ping, puertos con servicio, cabeceras, verificación multi-fuente, evidencia y resumen.
-- **HTML** con mapa embebido cuando hay coordenadas.
-- **CSV** en formato campo/valor y **PDF** simple sin dependencias.
-- **JSON** de evidencia con los datos en bruto y su SHA-256.
-
-El SHA-256 de la evidencia se imprime en el resto de formatos, así se puede comprobar que el informe no se alteró (`certutil -hashfile reporte_IP_casa_20261018_153000.json SHA256` en Windows o `sha256sum` en Linux). Los nombres llevan marca de tiempo y los puertos se listan con servicio al estilo nmap (PORT / STATE / SERVICE / DETALLE).
-
-## API web
-
-`webapp.py` expone las consultas pasivas por HTTP con límite por IP y minuto. Por defecto escucha en `http://127.0.0.1:5000`.
+### Ejecutar localmente
 
 ```bash
 pip install -r requirements-web.txt
@@ -157,79 +159,142 @@ export DARKLY_TOKEN=tu_token_aqui
 python webapp.py
 ```
 
-**`DARKLY_TOKEN` es obligatorio:** si no está definida, la API se niega a arrancar.  
-`web/` incluye una demo mínima. El escaneo está desactivado por defecto. Endpoints, autenticación y variables de entorno: **[docs/03-Referencia/api.md](docs/03-Referencia/api.md)**.
+La API escucha en `http://127.0.0.1:5000`.
+
+### Autenticación
+
+`DARKLY_TOKEN` es **obligatorio**. Se envía por cabecera:
+
+```bash
+curl -H "X-Token: tu_token_aqui" http://127.0.0.1:5000/api/health
+```
+
+### Endpoints principales
+
+| Endpoint | Método | Límite | Descripción |
+|----------|--------|--------|-------------|
+| `/api/health` | GET | 60/min | Estado de la API |
+| `/api/dns` | GET | 60/min | Resolución DNS |
+| `/api/geo` | GET | 60/min | Geolocalización de IP |
+| `/api/ptr` | GET | 60/min | DNS inverso |
+| `/api/rdap` | GET | 30/min | Registro RDAP |
+| `/api/headers` | GET | 30/min | Cabeceras HTTP |
+| `/api/urlscan` | GET | 60/min | Análisis de URL |
+| `/api/hash` | GET | 60/min | Hash SHA-256 / MD5 / etc. |
+| `/api/subdomains` | GET | 10/min | Subdominios (crt.sh) |
+| `/api/ghuser` | GET | 30/min | Perfil GitHub |
+| `/api/user` | GET | 5/min | Búsqueda de usuario (17 sitios) |
+| `/api/breach` | POST | 10/min | Auditoría de contraseña (HIBP) |
+| `/api/scan` | GET | 5/min | Escaneo de puertos *(requiere token + ENABLE_SCAN=1)* |
 
 ### Despliegue con Docker
 
 ```bash
-# Construir
+# Construir imagen
 docker build -t darkly-api .
 
-# Ejecutar (requiere DARKLY_TOKEN)
+# Ejecutar contenedor
 docker run -e DARKLY_TOKEN=tu_token_aqui -p 5000:5000 darkly-api
 
 # Con docker-compose
 DARKLY_TOKEN=tu_token_aqui docker-compose up
 ```
 
-El contenedor escucha en el puerto 5000. El escaneo de puertos viene desactivado por defecto (`ENABLE_SCAN=0`).
+---
 
-## Tests
+## 🧪 Tests y CI
 
 ```bash
-pip install pytest
-pytest tests/test_darkly.py -v     # Python
-cd go && go test ./...              # Go
+# Python
+pip install -r requirements.txt pytest
+pytest tests/test_darkly.py -v
+
+# Go
+cd go
+go test ./...
 ```
 
-También hay un workflow de GitHub Actions (`.github/workflows/test.yml`) que corre los tests en Ubuntu y Windows en cada push/PR.
+El proyecto incluye GitHub Actions (`.github/workflows/test.yml`) que ejecuta **linting** (`ruff`, `black`, `gofmt`) y **tests** en **Ubuntu y Windows** en cada push y PR.
 
-## Estructura
+---
+
+## 📁 Estructura del proyecto
 
 ```
-darkly.py            # menú neón en español
-install.py           # instalador multiplataforma (Termux/Linux/Windows)
-webapp.py + web/     # API + web pública (Flask, segura por defecto)
-tools/               # networking, security, gathering, username, system_tools, reporter, gospeed
-go/                  # darkly-go v2.1 con los mismos módulos en Go
-docs/                # manuales en español (arquitectura, uso, referencia)
-reportes/            # se auto-crea al usarlo (no se sube a git)
-assets/              # logo y capturas del README
+darkly.py            # Menú interactivo en Python (colores neon)
+install.py           # Instalador multiplataforma (Termux/Linux/Windows/macOS)
+webapp.py            # API web (Flask, segura por defecto)
+exceptions.py        # Excepciones personalizadas (DarklyError y subclases)
+requirements.txt     # Dependencias de producción
+requirements-dev.txt # Dependencias de desarrollo (ruff, black)
+pyproject.toml       # Configuración de Black
+.ruff.toml           # Configuración de Ruff
+Dockerfile           # Imagen Docker para la API web
+docker-compose.yml   # Orquestación con Docker Compose
+tools/               # Módulos Python (networking, security, gathering, etc.)
+go/                  # darkly-go (módulos rápidos en Go)
+web/                 # Demo mínima para la API web
+docs/                # Manuales en español
+reportes/            # Reportes generados (auto-creado, no se sube a git)
+assets/              # Logo y capturas
+.github/workflows/   # CI/CD (GitHub Actions)
+tests/               # Pruebas unitarias (pytest + go test)
 ```
 
-## Compatibilidad
+---
 
-| Función | Windows | Linux | Termux/Android |
-|---|---|---|---|
-| Menú Python y módulos | Sí | Sí | Sí |
-| `darkly-go` | Sí | Sí | Sí |
-| Ping y traceroute | Sí | Sí | Reducido sin root |
-| Reportes (HTML/TXT/CSV/PDF/JSON) | Sí | Sí | Sí |
-| API web (Flask) | Sí | Sí | Sí |
+## 📄 Reportes
 
-macOS no está cubierto por el instalador, aunque los módulos de Python y Go funcionan si las herramientas del sistema están presentes.
+Cada consulta de IP puede generar cinco archivos en `reportes/`:
 
-## Seguridad y uso responsable
+- **TXT** — 10 secciones: geo, PTR, RDAP, DNS, ping, puertos, cabeceras, verificación multi-fuente, evidencia y resumen.
+- **HTML** — Con mapa embebido cuando hay coordenadas.
+- **CSV** — Formato campo/valor.
+- **PDF** — Simple, sin dependencias externas.
+- **JSON** — Datos en bruto con su SHA-256 para verificar integridad.
+
+Los nombres llevan marca de tiempo y los puertos se listan al estilo nmap (PORT / STATE / SERVICE / DETALLE).
+
+---
+
+## 🛡️ Seguridad y uso responsable
 
 - **Solo objetivos propios o autorizados.** El escaneo de puertos exige confirmación explícita y está desactivado en la API pública.
-- **Modo pasivo.** Sin exploits, sin logins, sin fuerza bruta; los hashes y las contraseñas se procesan en local.
+- **Modo pasivo.** Sin exploits, sin logins, sin fuerza bruta; los hashes y contraseñas se procesan en local.
 - **Contraseñas.** La verificación HIBP solo envía 5 caracteres del SHA-1 (k-anonymity); en la API va por `POST`, nunca en la URL.
-- **Sin secretos en el código.** No hay claves ni tokens embebidos; todo va por variables de entorno.
+- **Sin secretos en el código.** Todo va por variables de entorno (`DARKLY_TOKEN`, etc.).
+- **Logging estructurado.** `darkly.py` registra eventos en `logging` con niveles `INFO`/`ERROR` en stderr.
 
-## Documentación
+---
+
+## 📚 Documentación adicional
 
 - [Manual completo](docs/index.md)
 - [Arquitectura](docs/01-Arquitectura/index.md)
 - [Uso e instalación](docs/02-Uso/index.md)
 - [Referencia: API, variables y errores](docs/03-Referencia/index.md)
 
-## Licencia
+---
+
+## 🆕 Mejoras recientes (v2.0.0)
+
+1. **Logging estructurado**: `darkly.py` usa `logging` con niveles `INFO`/`ERROR`.
+2. **Type hints**: `darkly.py` y `webapp.py` con anotaciones de tipo.
+3. **Excepciones personalizadas**: `exceptions.py` con `DarklyError` y 5 subclases.
+4. **Linter y formato**: `ruff`, `black` y `gofmt` integrados en CI.
+5. **Docker**: `Dockerfile` y `docker-compose.yml` para la API web.
+6. **Soporte macOS**: `install.py` detecta `darwin` y usa Homebrew.
+
+---
+
+## 📄 Licencia
 
 MIT. Consulta el archivo [LICENSE](LICENSE).
 
-## Autor
+---
+
+## 👤 Autor
 
 **Crist Code** — https://github.com/hackcrist/darkly
 
-Si te sirve, deja una estrella en GitHub.
+Si te sirve, deja una ⭐ en GitHub.
