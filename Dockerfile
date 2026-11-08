@@ -12,14 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt requirements-web.txt ./
 RUN pip install --no-cache-dir -r requirements-web.txt
 
-# Código de la aplicación
-COPY darkly.py ./
-COPY webapp.py ./
-COPY openapi.yaml ./
-COPY config.yaml.example ./
-COPY tools ./tools
+# Código de la aplicación (estructura de paquetes)
+COPY darkly ./darkly
 COPY web ./web
-COPY exceptions.py ./
 
 # Puerto de la API
 EXPOSE 5000
@@ -30,4 +25,5 @@ ENV ENABLE_SCAN="0"
 ENV RATE_LIMIT_ENABLED="1"
 ENV TRUST_PROXY="0"
 
-ENTRYPOINT ["python", "webapp.py"]
+# Punto de entrada: ejecutar como módulo para que resuelva paquetes
+ENTRYPOINT ["python", "-m", "darkly.api.webapp"]

@@ -11,10 +11,10 @@ import sys
 import time
 from typing import Any
 
-# Asegura que tools/ sea importable desde cualquier carpeta
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Asegura que la raíz del repo y tools/ sean importables desde cualquier carpeta
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from exceptions import DarklyError
+from darkly.core.exceptions import DarklyError
 
 __version__ = "2.0.0"
 
@@ -50,7 +50,7 @@ try:
 except Exception:
     pass
 
-from tools import networking, security, gathering, system_tools, reporter, username, gospeed
+from darkly.tools import networking, security, gathering, system_tools, reporter, username, gospeed
 
 # Activa colores ANSI en Windows 10+
 if os.name == "nt":

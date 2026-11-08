@@ -14,31 +14,31 @@ import pytest
 
 
 def test_darkly_version():
-    """darkly.py debe exponer __version__."""
-    import darkly
+    """darkly.core.darkly_cli debe exponer __version__."""
+    import darkly.core.darkly_cli as darkly_cli
 
-    assert hasattr(darkly, "__version__")
-    assert darkly.__version__ == "2.0.0"
+    assert hasattr(darkly_cli, "__version__")
+    assert darkly_cli.__version__ == "2.0.0"
 
 
 def test_tools_modules_importan():
-    """Los módulos de tools deben poder importarse sin errores."""
+    """Los módulos de darkly.tools deben poder importarse sin errores."""
     modulos = [
-        "tools.networking",
-        "tools.security",
-        "tools.gathering",
-        "tools.system_tools",
-        "tools.reporter",
-        "tools.username",
-        "tools.gospeed",
+        "darkly.tools.networking",
+        "darkly.tools.security",
+        "darkly.tools.gathering",
+        "darkly.tools.system_tools",
+        "darkly.tools.reporter",
+        "darkly.tools.username",
+        "darkly.tools.gospeed",
     ]
     for nombre in modulos:
         importlib.import_module(nombre)
 
 
 def test_security_hash_retorna_str():
-    """security.hash_text debe retornar una cadena no vacía."""
-    from tools.security import hash_text
+    """darkly.tools.security.hash_text debe retornar una cadena no vacía."""
+    from darkly.tools.security import hash_text
 
     resultado = hash_text("prueba", algo="sha256")
     assert isinstance(resultado, str)

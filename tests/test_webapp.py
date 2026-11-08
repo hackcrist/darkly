@@ -18,7 +18,7 @@ os.environ.setdefault("DARKLY_TOKEN", "test-token-12345")
 
 pytest.importorskip("flask")
 
-from webapp import app  # noqa: E402
+from darkly.api.webapp import app  # noqa: E402
 
 
 @pytest.fixture

@@ -44,11 +44,11 @@ def is_termux():
 
 def main():
     say("DARKLY TOOLS - Instalador", "c")
-    here = os.path.dirname(os.path.abspath(__file__))
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     system = platform.system().lower()
 
     if system != "windows" and not DRY:
-        for f in ("darkly.py", "install.py"):
+        for f in ("darkly/core/darkly_cli.py", "darkly/scripts/install.py"):
             p = os.path.join(here, f)
             try:
                 os.chmod(p, 0o755)
