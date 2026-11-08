@@ -37,9 +37,9 @@ def test_tools_modules_importan():
 
 
 def test_security_hash_retorna_str():
-    """security.hash_string debe retornar una cadena no vacía."""
-    from tools.security import hash_string
+    """security.hash_text debe retornar una cadena no vacía."""
+    from tools.security import hash_text
 
-    resultado = hash_string("prueba", algoritmo="sha256")
+    resultado = hash_text("prueba", algo="sha256")
     assert isinstance(resultado, str)
     assert len(resultado) > 0
