@@ -1,7 +1,7 @@
 # Darkly Tools
 
 <p align="center">
-  <img src="assets/logo.svg" alt="Darkly Tools" width="500">
+  <img src="https://raw.githubusercontent.com/hackcrist/darkly/main/assets/logo.svg" alt="Darkly Tools" width="500">
 </p>
 
 <p align="center">
@@ -252,6 +252,16 @@ docker run -e DARKLY_TOKEN=tu_token_aqui -p 5000:5000 darkly-api
 # Con docker-compose
 DARKLY_TOKEN=tu_token_aqui docker-compose up
 ```
+
+---
+
+## 📸 Capturas
+
+| Web | Termux |
+|---|---|
+| <img src="https://raw.githubusercontent.com/hackcrist/darkly/main/assets/web.png" alt="Darkly Web" width="300"> | <img src="https://raw.githubusercontent.com/hackcrist/darkly/main/assets/termux.jpeg" alt="Termux" width="130"> |
+
+<img src="https://raw.githubusercontent.com/hackcrist/darkly/main/assets/windows-terminal.png" alt="Darkly en Windows Terminal" width="700">
 
 ---
 
