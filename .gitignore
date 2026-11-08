@@ -9,6 +9,7 @@ go/darkly-go.exe
 __pycache__/
 */__pycache__/
 *.pyc
+.pytest_cache/
 
 # Logs de pruebas locales
 *.log
