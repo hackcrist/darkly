@@ -161,13 +161,66 @@ python webapp.py
 
 La API escucha en `http://127.0.0.1:5000`.
 
-### Autenticación
+---
 
-`DARKLY_TOKEN` es **obligatorio**. Se envía por cabecera:
+### 🔑 Cómo generar tu `DARKLY_TOKEN`
+
+El token es una contraseña larga y aleatoria que tú generas localmente. **No se comparte con nadie.**
+
+**Opción 1 — OpenSSL (recomendado):**
 
 ```bash
-curl -H "X-Token: tu_token_aqui" http://127.0.0.1:5000/api/health
+# En Linux, macOS o Termux
+openssl rand -hex 32
 ```
+
+Salida ejemplo: `a3f7c9e1b2d4f6a8c0e2b4d6f8a0c2e4f6b8d0a2c4f6e8b0a2c4d6f8a0b2c4d6`
+
+**Opción 2 — Python:**
+
+```bash
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+**Opción 3 — Windows (PowerShell):**
+
+```powershell
+-join ((48..57) + (97..102) | Get-Random -Count 64 | % {[char]$_})
+```
+
+---
+
+### Guardar el token de forma segura
+
+No escribas el token directamente en comandos que se guarden en el historial. Usa un archivo `.env` (no se sube a git):
+
+```bash
+# Crear archivo .env (solo tú lo ves)
+echo "DARKLY_TOKEN=$(openssl rand -hex 32)" > .env
+
+# Cargarlo antes de iniciar la API
+set -a && source .env && set +a
+python webapp.py
+```
+
+En Windows PowerShell:
+
+```powershell
+$env:DARKLY_TOKEN = "a3f7c9e1b2d4f6a8c0e2b4d6f8a0c2e4f6b8d0a2c4f6e8b0a2c4d6f8a0b2c4d6"
+python webapp.py
+```
+
+### Autenticación
+
+`DARKLY_TOKEN` es **obligatorio**. Si no está definida, `webapp.py` se niega a arrancar.
+
+Se envía por cabecera en cada petición:
+
+```bash
+curl -H "X-Token: TU_TOKEN_AQUI" http://127.0.0.1:5000/api/health
+```
+
+> ⚠️ Nunca subas tu token real a GitHub ni lo compartas en chats. Si se filtra, genera uno nuevo y reemplázalo en todas partes.
 
 ### Endpoints principales
 
