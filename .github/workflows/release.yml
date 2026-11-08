@@ -1,0 +1,39 @@
+name: Release Darkly Tools
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: Compilar binarios para múltiples plataformas
+        run: |
+          cd go
+          GOOS=linux   GOARCH=amd64 go build -o darkly-go-linux-amd64   .
+          GOOS=linux   GOARCH=arm64 go build -o darkly-go-linux-arm64  .
+          GOOS=windows GOARCH=amd64 go build -o darkly-go-windows-amd64.exe .
+          GOOS=darwin  GOARCH=amd64 go build -o darkly-go-darwin-amd64  .
+          cd ..
+
+      - name: Crear release en GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            go/darkly-go-linux-amd64
+            go/darkly-go-linux-arm64
+            go/darkly-go-windows-amd64.exe
+            go/darkly-go-darwin-amd64
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

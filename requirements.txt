@@ -1,3 +1,4 @@
 psutil
 certifi
 pytest
+PyYAML

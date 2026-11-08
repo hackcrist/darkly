@@ -1,0 +1,289 @@
+openapi: 3.0.3
+info:
+  title: Darkly Tools API
+  description: |
+    API de OSINT pasivo y herramientas de redes para Darkly Tools.
+    Solo fines educativos. Úsala con autorización.
+  version: 2.0.0
+  contact:
+    name: Crist Code
+    url: https://github.com/hackcrist/darkly
+servers:
+  - url: http://127.0.0.1:5000
+    description: Servidor local de desarrollo
+paths:
+  /api/health:
+    get:
+      summary: Estado de la API
+      tags: [Sistema]
+      responses:
+        '200':
+          description: API operativa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  scan_enabled:
+                    type: boolean
+                    example: false
+                  rate_limited:
+                    type: boolean
+                    example: true
+  /api/dns:
+    get:
+      summary: Resolución DNS
+      tags: [Redes]
+      parameters:
+        - in: query
+          name: host
+          required: true
+          schema:
+            type: string
+            example: example.com
+      responses:
+        '200':
+          description: Resultado DNS
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Parámetro faltante
+  /api/geo:
+    get:
+      summary: Geolocalización de IP
+      tags: [OSINT]
+      parameters:
+        - in: query
+          name: ip
+          required: true
+          schema:
+            type: string
+            example: 8.8.8.8
+      responses:
+        '200':
+          description: Información geo de IP
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/ptr:
+    get:
+      summary: DNS inverso (PTR)
+      tags: [Redes]
+      parameters:
+        - in: query
+          name: ip
+          required: true
+          schema:
+            type: string
+            example: 8.8.8.8
+      responses:
+        '200':
+          description: Registro PTR
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/rdap:
+    get:
+      summary: Registro RDAP
+      tags: [OSINT]
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+            example: google.com
+      responses:
+        '200':
+          description: Resultado RDAP
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/headers:
+    get:
+      summary: Cabeceras HTTP
+      tags: [Web]
+      parameters:
+        - in: query
+          name: url
+          required: true
+          schema:
+            type: string
+            example: https://ejemplo.com
+      responses:
+        '200':
+          description: Cabeceras HTTP
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/urlscan:
+    get:
+      summary: Análisis de URL
+      tags: [Seguridad]
+      parameters:
+        - in: query
+          name: url
+          required: true
+          schema:
+            type: string
+            example: https://ejemplo.com
+      responses:
+        '200':
+          description: Resultado del análisis
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/hash:
+    get:
+      summary: Generar hash
+      tags: [Seguridad]
+      parameters:
+        - in: query
+          name: text
+          required: true
+          schema:
+            type: string
+            example: hola
+        - in: query
+          name: algo
+          required: false
+          schema:
+            type: string
+            example: sha256
+      responses:
+        '200':
+          description: Hash generado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  algo:
+                    type: string
+                  hex:
+                    type: string
+        '400':
+          description: Parámetros inválidos
+  /api/subdomains:
+    get:
+      summary: Subdominios (crt.sh)
+      tags: [OSINT]
+      parameters:
+        - in: query
+          name: domain
+          required: true
+          schema:
+            type: string
+            example: google.com
+      responses:
+        '200':
+          description: Lista de subdominios
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/ghuser:
+    get:
+      summary: Perfil GitHub
+      tags: [OSINT]
+      parameters:
+        - in: query
+          name: u
+          required: true
+          schema:
+            type: string
+            example: torvalds
+      responses:
+        '200':
+          description: Perfil de usuario GitHub
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/user:
+    get:
+      summary: Búsqueda de usuario en 17 sitios
+      tags: [OSINT]
+      parameters:
+        - in: query
+          name: u
+          required: true
+          schema:
+            type: string
+            example: torvalds
+      responses:
+        '200':
+          description: Resultados de búsqueda
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/breach:
+    post:
+      summary: Auditoría de contraseña (HIBP)
+      tags: [Seguridad]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Resultado de auditoría
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Petición inválida
+  /api/scan:
+    get:
+      summary: Escaneo de puertos (requiere token)
+      tags: [Redes]
+      security:
+        - TokenAuth: []
+      parameters:
+        - in: query
+          name: host
+          required: true
+          schema:
+            type: string
+            example: 127.0.0.1
+        - in: query
+          name: ports
+          required: false
+          schema:
+            type: string
+            example: 22,80,443
+      responses:
+        '200':
+          description: Resultado del escaneo
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          description: Token inválido o faltante
+        '403':
+          description: Escaneo desactivado (ENABLE_SCAN=0)
+components:
+  securitySchemes:
+    TokenAuth:
+      type: apiKey
+      in: header
+      name: X-Token
+      description: Token de acceso configurado en DARKLY_TOKEN

@@ -15,6 +15,8 @@ RUN pip install --no-cache-dir -r requirements-web.txt
 # Código de la aplicación
 COPY darkly.py ./
 COPY webapp.py ./
+COPY openapi.yaml ./
+COPY config.yaml.example ./
 COPY tools ./tools
 COPY web ./web
 COPY exceptions.py ./

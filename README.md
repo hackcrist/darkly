@@ -222,6 +222,28 @@ curl -H "X-Token: TU_TOKEN_AQUI" http://127.0.0.1:5000/api/health
 
 > ⚠️ Nunca subas tu token real a GitHub ni lo compartas en chats. Si se filtra, genera uno nuevo y reemplázalo en todas partes.
 
+### Configuración con `config.yaml`
+
+Además de variables de entorno, puedes usar un archivo `config.yaml`:
+
+```bash
+cp config.yaml.example config.yaml
+# Edita config.yaml con tu token y preferencias
+python webapp.py
+```
+
+Las variables de entorno tienen prioridad sobre los valores de `config.yaml`.
+
+### Especificación OpenAPI
+
+La API expone su especificación OpenAPI 3.0 en:
+
+```bash
+curl http://127.0.0.1:5000/api/openapi.json
+```
+
+Puedes importar ese JSON en [Swagger UI](https://swagger.io/tools/swagger-ui/) o [Postman] para explorar y probar los endpoints fácilmente.
+
 ### Endpoints principales
 
 | Endpoint | Método | Límite | Descripción |

@@ -1,0 +1,10 @@
+# Configuración de Darkly API (webapp.py)
+# Copia este archivo a config.yaml y ajusta los valores según tu entorno.
+# Las variables de entorno tienen prioridad sobre este archivo.
+
+token: TU_TOKEN_AQUI
+enable_scan: false
+rate_limit_enabled: true
+trust_proxy: false
+port: 5000
+cors_origin: "*"

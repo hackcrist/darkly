@@ -14,6 +14,7 @@ import threading
 from functools import wraps
 from typing import Any, Callable
 
+import yaml
 from flask import Flask, jsonify, request, send_from_directory, Response
 
 from tools import networking, security, gathering, username
@@ -23,15 +24,40 @@ WEB_DIR = os.path.join(BASE_DIR, "web")
 
 app = Flask(__name__, static_folder=WEB_DIR, static_url_path="")
 
+# --- Carga de configuración (variables de entorno tienen prioridad) ---
 TOKEN = os.environ.get("DARKLY_TOKEN", "")
+ENABLE_SCAN = os.environ.get("ENABLE_SCAN", "0") == "1"
+RATE_LIMIT_ENABLED = os.environ.get("RATE_LIMIT_ENABLED", "1") == "1"
+TRUST_PROXY = os.environ.get("TRUST_PROXY", "0") == "1"
+PORT = int(os.environ.get("PORT", "5000"))
+CORS_ORIGIN = os.environ.get("CORS_ORIGIN", "*")
+
+# Si existe config.yaml, cargar valores que no estén definidos por variable de entorno
+_config_path = os.path.join(BASE_DIR, "config.yaml")
+if os.path.exists(_config_path):
+    try:
+        with open(_config_path, encoding="utf-8") as _f:
+            _cfg = yaml.safe_load(_f) or {}
+        if not TOKEN and _cfg.get("token"):
+            TOKEN = _cfg["token"]
+        if os.environ.get("ENABLE_SCAN") is None and _cfg.get("enable_scan") is not None:
+            ENABLE_SCAN = bool(_cfg["enable_scan"])
+        if os.environ.get("RATE_LIMIT_ENABLED") is None and _cfg.get("rate_limit_enabled") is not None:
+            RATE_LIMIT_ENABLED = bool(_cfg["rate_limit_enabled"])
+        if os.environ.get("TRUST_PROXY") is None and _cfg.get("trust_proxy") is not None:
+            TRUST_PROXY = bool(_cfg["trust_proxy"])
+        if os.environ.get("PORT") is None and _cfg.get("port"):
+            PORT = int(_cfg["port"])
+        if os.environ.get("CORS_ORIGIN") is None and _cfg.get("cors_origin"):
+            CORS_ORIGIN = _cfg["cors_origin"]
+    except Exception:
+        pass  # Si falla la lectura, se usan valores por defecto / entorno
+
 if not TOKEN:
     raise SystemExit(
         "Falta DARKLY_TOKEN. Configúrala antes de iniciar la API web, "
         "ejemplo: export DARKLY_TOKEN=tu_token_aqui"
     )
-ENABLE_SCAN = os.environ.get("ENABLE_SCAN", "0") == "1"
-RATE_LIMIT_ENABLED = os.environ.get("RATE_LIMIT_ENABLED", "1") == "1"
-TRUST_PROXY = os.environ.get("TRUST_PROXY", "0") == "1"
 
 # Límite simple en memoria con limpieza automática: {ip: [timestamps]}
 _hits: dict[str, list[float]] = {}
@@ -280,6 +306,16 @@ def api_scan() -> Response:
     return jsonify({"host": host, "ports": out})
 
 
+@app.get("/api/openapi.json")
+def api_openapi() -> Response:
+    """Especificación OpenAPI de la API."""
+    openapi_path = os.path.join(BASE_DIR, "openapi.yaml")
+    if not os.path.exists(openapi_path):
+        return jsonify({"error": "Especificación OpenAPI no disponible"}), 404
+    with open(openapi_path, encoding="utf-8") as f:
+        spec = yaml.safe_load(f)
+    return jsonify(spec)
+
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "5000"))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=PORT)
