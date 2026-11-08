@@ -52,7 +52,7 @@
 ```bash
 git clone https://github.com/hackcrist/darkly.git
 cd darkly
-python install.py
+python darkly/scripts/install.py
 ```
 
 El instalador detecta automáticamente tu sistema:
@@ -89,13 +89,16 @@ cd ..
 
 ```bash
 # Menú interactivo (Python)
-python darkly.py
+python -m darkly.core.darkly_cli
 
 # Ver versión
-python darkly.py --version
+python -m darkly.core.darkly_cli --version
 
 # Menú interactivo (Go)
 go/darkly-go menu
+
+# API web (Flask)
+python -m darkly.api.webapp
 ```
 
 ---
@@ -307,7 +310,7 @@ El proyecto incluye GitHub Actions (`.github/workflows/test.yml`) que ejecuta **
 
 ```
 darkly.py            # Menú interactivo en Python (colores neon)
-install.py           # Instalador multiplataforma (Termux/Linux/Windows/macOS)
+darkly/scripts/install.py   # Instalador multiplataforma (Termux/Linux/Windows/macOS)
 webapp.py            # API web (Flask, segura por defecto)
 exceptions.py        # Excepciones personalizadas (DarklyError y subclases)
 requirements.txt     # Dependencias de producción
